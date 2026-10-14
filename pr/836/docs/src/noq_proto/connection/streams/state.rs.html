@@ -613,7 +613,7 @@
 <a href=#613 id=613 data-nosnippet>613</a>        }
 <a href=#614 id=614 data-nosnippet>614</a>
 <a href=#615 id=615 data-nosnippet>615</a>        <span class="kw">if </span>was_pending {
-<a href=#616 id=616 data-nosnippet>616</a>            <span class="self">self</span>.pending.remove(id, stream.affinity);
+<a href=#616 id=616 data-nosnippet>616</a>            <span class="self">self</span>.pending.remove(id);
 <a href=#617 id=617 data-nosnippet>617</a>        }
 <a href=#618 id=618 data-nosnippet>618</a>        entry.remove_entry();
 <a href=#619 id=619 data-nosnippet>619</a>        <span class="self">self</span>.stream_freed(id, StreamHalf::Send);
@@ -1435,7 +1435,7 @@
 <a href=#1435 id=1435 data-nosnippet>1435</a>        }
 <a href=#1436 id=1436 data-nosnippet>1436</a>
 <a href=#1437 id=1437 data-nosnippet>1437</a>        <span class="comment">// Moving a queued stream keeps its turn relative to streams in the destination bucket.
-<a href=#1438 id=1438 data-nosnippet>1438</a>        </span>queue.set_affinity(ids[<span class="number">0</span>], <span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(path));
+<a href=#1438 id=1438 data-nosnippet>1438</a>        </span>queue.set_affinity(ids[<span class="number">0</span>], <span class="prelude-val">Some</span>(path));
 <a href=#1439 id=1439 data-nosnippet>1439</a>        <span class="kw">for </span>id <span class="kw">in </span><span class="kw-2">&amp;</span>ids[..<span class="number">3</span>] {
 <a href=#1440 id=1440 data-nosnippet>1440</a>            <span class="macro">assert_eq!</span>(queue.pop(path, <span class="bool-val">true</span>).unwrap().id, <span class="kw-2">*</span>id);
 <a href=#1441 id=1441 data-nosnippet>1441</a>        }
