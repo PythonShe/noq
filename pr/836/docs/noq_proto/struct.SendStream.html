@@ -24,10 +24,10 @@ the chunk will be advanced and contain only non-written data after the call.</p>
 </ul>
 </div></details><details class="toggle method-toggle" open><summary><section id="method.set_affinity" class="method"><a class="src rightside" href="../src/noq_proto/connection/streams/mod.rs.html#414-443">Source</a><h4 class="code-header">pub fn <a href="#method.set_affinity" class="fn">set_affinity</a>(
     &amp;mut self,
-    affinity: <a class="enum" href="enum.StreamAffinity.html" title="enum noq_proto::StreamAffinity">StreamAffinity</a>,
+    new_affinity: <a class="enum" href="enum.StreamAffinity.html" title="enum noq_proto::StreamAffinity">StreamAffinity</a>,
 ) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.unit.html">()</a>, <a class="struct" href="struct.ClosedStream.html" title="struct noq_proto::ClosedStream">ClosedStream</a>&gt;</h4></section></summary><div class="docblock"><p>Sets the path affinity of a stream.</p>
-<p>Applies to subsequently packetized STREAM frames, including retransmissions and FINs.
-Does not affect stream control frames or packets already built for transmission.
+<p>Applies to pending and future STREAM data, including retransmissions and FINs.
+Does not affect stream control frames.
 Unblocking rejoins the back of the stream’s priority group.</p>
 <h5 id="errors"><a class="doc-anchor" href="#errors">§</a>Errors</h5>
 <p>Returns <a href="struct.ClosedStream.html" title="struct noq_proto::ClosedStream"><code>ClosedStream</code></a> if the stream no longer exists.</p>
