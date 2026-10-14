@@ -524,9 +524,9 @@
 <a href=#524 id=524 data-nosnippet>524</a>
 <a href=#525 id=525 data-nosnippet>525</a>    <span class="doccomment">/// Removes the highest-ranked entry eligible for this path.
 <a href=#526 id=526 data-nosnippet>526</a>    ///
-<a href=#527 id=527 data-nosnippet>527</a>    /// Includes the Any queue only when `include_any` is true.
-<a href=#528 id=528 data-nosnippet>528</a>    </span><span class="kw">fn </span>pop(<span class="kw-2">&amp;mut </span><span class="self">self</span>, path: PathId, include_any: bool) -&gt; <span class="prelude-ty">Option</span>&lt;PendingStream&gt; {
-<a href=#529 id=529 data-nosnippet>529</a>        <span class="kw">let </span>any = include_any.then(|| <span class="self">self</span>.any.peek()).flatten();
+<a href=#527 id=527 data-nosnippet>527</a>    /// Includes the [`StreamAffinity::Any`] queue only when `include_any` is true.
+<a href=#528 id=528 data-nosnippet>528</a>    </span><span class="kw">fn </span>pop(<span class="kw-2">&amp;mut </span><span class="self">self</span>, path: PathId, include_affinity_any: bool) -&gt; <span class="prelude-ty">Option</span>&lt;PendingStream&gt; {
+<a href=#529 id=529 data-nosnippet>529</a>        <span class="kw">let </span>any = include_affinity_any.then(|| <span class="self">self</span>.any.peek()).flatten();
 <a href=#530 id=530 data-nosnippet>530</a>        <span class="kw">let </span>sticky = <span class="self">self</span>.sticky.get(<span class="kw-2">&amp;</span>path).and_then(|q| q.peek());
 <a href=#531 id=531 data-nosnippet>531</a>        <span class="kw">let </span>pending = <span class="kw">if </span>any &gt; sticky {
 <a href=#532 id=532 data-nosnippet>532</a>            <span class="self">self</span>.queue_mut(<span class="prelude-val">None</span>).pop()
