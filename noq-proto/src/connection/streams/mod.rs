@@ -1,5 +1,5 @@
 use std::{
-    collections::{BinaryHeap, hash_map},
+    collections::hash_map,
     io,
     ops::{Deref, DerefMut},
 };
@@ -26,6 +26,7 @@ use send::{BytesSource, Send, SendState};
 pub use send::{FinishError, WriteError};
 
 mod state;
+
 #[allow(unreachable_pub)] // fuzzing only
 pub use state::StreamsState;
 
@@ -478,8 +479,8 @@ pub enum StreamAffinity {
 
 /// Pending streams partitioned by affinity, with shared priority and fairness ordering.
 struct PendingStreamsQueue {
-    any: BinaryHeap<PendingStream>,
-    sticky_by_path: FxHashMap<PathId, BinaryHeap<PendingStream>>,
+    any: IndexedStreamsQueue,
+    sticky_by_path: FxHashMap<PathId, IndexedStreamsQueue>,
     /// A monotonically decreasing counter, used to implement round-robin scheduling for streams of
     /// the same priority. Underflowing is not a practical concern, as it is initialized to
     /// u64::MAX and only decremented by 1 in `push_pending`
@@ -489,7 +490,7 @@ struct PendingStreamsQueue {
 impl PendingStreamsQueue {
     fn new() -> Self {
         Self {
-            any: BinaryHeap::new(),
+            any: IndexedStreamsQueue::default(),
             sticky_by_path: FxHashMap::default(),
             recency: u64::MAX,
         }
@@ -506,7 +507,7 @@ impl PendingStreamsQueue {
         // As the recency counter is monotonically decreasing, we know that using its value to sort
         // this stream will queue it after all other queued streams of the same priority.
         // This is enough to implement round-robin scheduling for streams that are still pending
-        // even after being handled, as in that case they are removed from the `BinaryHeap`,
+        // even after being handled, as in that case they are removed from the queue,
         // handled, and then immediately reinserted.
         self.recency -= 1;
         let recency = self.recency;
@@ -529,19 +530,10 @@ impl PendingStreamsQueue {
     }
 
     fn set_affinity(&mut self, id: StreamId, old: Option<PathId>, new: Option<PathId>) {
-        let mut moved = Vec::new();
-        self.queue_mut(old).retain(|pending| {
-            if pending.id == id {
-                moved.push(pending.clone());
-                false
-            } else {
-                true
-            }
-        });
-        if moved.is_empty() {
-            return;
+        let moved = self.queue_mut(old).remove(id);
+        if let Some(pending) = moved {
+            self.queue_mut(new).push(pending);
         }
-        self.queue_mut(new).extend(moved);
     }
 
     fn queue_mut(&mut self, sticky: Option<PathId>) -> PendingQueueMut<'_> {
@@ -550,7 +542,9 @@ impl PendingStreamsQueue {
             Some(path) => {
                 let entry = match self.sticky_by_path.entry(path) {
                     hash_map::Entry::Occupied(entry) => entry,
-                    hash_map::Entry::Vacant(entry) => entry.insert_entry(BinaryHeap::new()),
+                    hash_map::Entry::Vacant(entry) => {
+                        entry.insert_entry(IndexedStreamsQueue::default())
+                    }
                 };
                 PendingQueueMut::Sticky(Some(entry))
             }
@@ -564,7 +558,7 @@ impl PendingStreamsQueue {
             StreamAffinity::Block => return,
         };
         // Abandoned-path queues might never be selected again.
-        self.queue_mut(sticky).retain(|pending| pending.id != id);
+        self.queue_mut(sticky).remove(id);
     }
 
     fn clear(&mut self) {
@@ -592,13 +586,13 @@ impl PendingStreamsQueue {
 }
 
 enum PendingQueueMut<'a> {
-    Any(&'a mut BinaryHeap<PendingStream>),
+    Any(&'a mut IndexedStreamsQueue),
     // The entry is present until Drop takes ownership to remove an empty bucket.
-    Sticky(Option<hash_map::OccupiedEntry<'a, PathId, BinaryHeap<PendingStream>>>),
+    Sticky(Option<hash_map::OccupiedEntry<'a, PathId, IndexedStreamsQueue>>),
 }
 
 impl Deref for PendingQueueMut<'_> {
-    type Target = BinaryHeap<PendingStream>;
+    type Target = IndexedStreamsQueue;
 
     fn deref(&self) -> &Self::Target {
         match self {
@@ -631,8 +625,109 @@ impl Drop for PendingQueueMut<'_> {
     }
 }
 
+#[derive(Default)]
+struct IndexedStreamsQueue {
+    queue: Vec<PendingStream>,
+    locations: FxHashMap<StreamId, usize>,
+}
+
+impl IndexedStreamsQueue {
+    fn push(&mut self, pending: PendingStream) {
+        // Late ACKs can clear pending work without removing the queue entry. A subsequent
+        // enqueue replaces its metadata rather than creating a second entry for the stream.
+        if let Some(&index) = self.locations.get(&pending.id) {
+            self.queue[index] = pending;
+            self.repair(index);
+        } else {
+            let index = self.queue.len();
+            self.locations.insert(pending.id, index);
+            self.queue.push(pending);
+            self.sift_up(index);
+        }
+    }
+
+    fn peek(&self) -> Option<&PendingStream> {
+        self.queue.first()
+    }
+
+    fn pop(&mut self) -> Option<PendingStream> {
+        self.remove(self.peek()?.id)
+    }
+
+    fn remove(&mut self, id: StreamId) -> Option<PendingStream> {
+        let index = self.locations.remove(&id)?;
+        let removed = self.queue.swap_remove(index);
+        if index < self.queue.len() {
+            self.locations.insert(self.queue[index].id, index);
+            self.repair(index);
+        }
+        Some(removed)
+    }
+
+    fn clear(&mut self) {
+        self.queue.clear();
+        self.locations.clear();
+    }
+
+    fn is_empty(&self) -> bool {
+        self.queue.is_empty()
+    }
+
+    fn iter(&self) -> impl Iterator<Item = &PendingStream> {
+        self.queue.iter()
+    }
+
+    #[cfg(test)]
+    fn len(&self) -> usize {
+        self.queue.len()
+    }
+
+    fn repair(&mut self, index: usize) {
+        if index > 0 && self.queue[index] > self.queue[(index - 1) / 2] {
+            self.sift_up(index);
+        } else {
+            self.sift_down(index);
+        }
+    }
+
+    fn sift_up(&mut self, mut index: usize) {
+        while index > 0 {
+            let parent = (index - 1) / 2;
+            if self.queue[parent] >= self.queue[index] {
+                break;
+            }
+            self.swap(parent, index);
+            index = parent;
+        }
+    }
+
+    fn sift_down(&mut self, mut index: usize) {
+        loop {
+            let mut child = 2 * index + 1;
+            if child >= self.queue.len() {
+                break;
+            }
+            let right = child + 1;
+            if right < self.queue.len() && self.queue[right] > self.queue[child] {
+                child = right;
+            }
+            if self.queue[index] >= self.queue[child] {
+                break;
+            }
+            self.swap(index, child);
+            index = child;
+        }
+    }
+
+    fn swap(&mut self, a: usize, b: usize) {
+        self.queue.swap(a, b);
+        self.locations.insert(self.queue[a].id, a);
+        self.locations.insert(self.queue[b].id, b);
+    }
+}
+
 /// The [`StreamId`] of a stream with pending data queued, ordered by its priority and recency
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 struct PendingStream {
     /// The priority of the stream
     // Note that this field should be kept above the `recency` field, in order for the `Ord` derive
@@ -745,5 +840,148 @@ impl BytesOrSlice<'_> for Bytes {
 impl<'a> BytesOrSlice<'a> for &'a [u8] {
     fn into_bytes(self) -> Bytes {
         Bytes::copy_from_slice(self)
+    }
+}
+
+#[cfg(all(test, not(target_family = "wasm")))]
+mod proptests {
+    use std::collections::BTreeMap;
+
+    use proptest::prelude::*;
+    use test_strategy::{Arbitrary, proptest};
+
+    use super::{IndexedStreamsQueue, PendingStream};
+    use crate::{Dir, Side, StreamId};
+
+    #[proptest]
+    fn indexed_queue_matches_reference(
+        #[strategy(proptest::collection::vec(any::<Op>(), 0..100))] ops: Vec<Op>,
+    ) {
+        let mut queue = IndexedStreamsQueue::default();
+        let mut reference = BTreeMap::<StreamId, PendingStream>::new();
+        for op in ops {
+            match op {
+                Op::Push {
+                    id,
+                    priority,
+                    recency,
+                } => {
+                    let pending = PendingStream {
+                        id: stream_id(id),
+                        priority,
+                        recency,
+                    };
+                    reference.insert(pending.id, pending.clone());
+                    queue.push(pending);
+                }
+                Op::Remove(id) => assert_eq!(
+                    queue.remove(stream_id(id)),
+                    reference.remove(&stream_id(id))
+                ),
+                Op::Pop => {
+                    let expected = reference.values().max().cloned();
+                    if let Some(pending) = &expected {
+                        reference.remove(&pending.id);
+                    }
+                    assert_eq!(queue.pop(), expected);
+                }
+                Op::Clear => {
+                    queue.clear();
+                    reference.clear();
+                }
+            }
+            check(&queue, &reference);
+        }
+        drain(&mut queue, &mut reference);
+    }
+
+    #[proptest]
+    fn indexed_queue_remove_positions(
+        #[strategy(proptest::collection::vec((priority(), recency()), 1..33))] entries: Vec<(
+            i32,
+            u64,
+        )>,
+        position: usize,
+    ) {
+        // Exercise the root, an internal node, the last slot, and an arbitrary slot.
+        for index in [
+            0,
+            entries.len() / 4,
+            entries.len() - 1,
+            position % entries.len(),
+        ] {
+            let mut queue = IndexedStreamsQueue::default();
+            let mut reference = BTreeMap::new();
+            for (id, &(priority, recency)) in entries.iter().enumerate() {
+                let pending = PendingStream {
+                    id: stream_id(id as u64),
+                    priority,
+                    recency,
+                };
+                reference.insert(pending.id, pending.clone());
+                queue.push(pending);
+                check(&queue, &reference);
+            }
+            let id = queue.queue[index].id;
+            assert_eq!(queue.remove(id), reference.remove(&id));
+            assert!(queue.remove(id).is_none());
+            check(&queue, &reference);
+            drain(&mut queue, &mut reference);
+        }
+    }
+
+    #[derive(Debug, Arbitrary)]
+    enum Op {
+        #[weight(20)]
+        Push {
+            #[strategy(0u64..16)]
+            id: u64,
+            #[strategy(priority())]
+            priority: i32,
+            #[strategy(recency())]
+            recency: u64,
+        },
+        #[weight(8)]
+        Remove(#[strategy(0u64..20)] u64),
+        #[weight(8)]
+        Pop,
+        #[weight(1)]
+        Clear,
+    }
+
+    fn priority() -> impl Strategy<Value = i32> {
+        prop_oneof![3 => -2i32..=2, 1 => any::<i32>(), 1 => Just(i32::MIN), 1 => Just(i32::MAX)]
+    }
+
+    fn recency() -> impl Strategy<Value = u64> {
+        prop_oneof![3 => 0u64..=4, 1 => any::<u64>(), 1 => Just(u64::MAX)]
+    }
+
+    fn stream_id(index: u64) -> StreamId {
+        StreamId::new(Side::Client, Dir::Uni, index)
+    }
+
+    fn check(queue: &IndexedStreamsQueue, reference: &BTreeMap<StreamId, PendingStream>) {
+        assert_eq!(queue.peek(), reference.values().max());
+        assert_eq!(queue.is_empty(), reference.is_empty());
+        assert_eq!(queue.len(), reference.len());
+        assert_eq!(queue.locations.len(), reference.len());
+        for (index, pending) in queue.queue.iter().enumerate() {
+            assert_eq!(queue.locations.get(&pending.id), Some(&index));
+            assert_eq!(reference.get(&pending.id), Some(pending));
+            if index > 0 {
+                assert!(queue.queue[(index - 1) / 2] >= *pending);
+            }
+        }
+    }
+
+    fn drain(queue: &mut IndexedStreamsQueue, reference: &mut BTreeMap<StreamId, PendingStream>) {
+        while let Some(expected) = reference.values().max().cloned() {
+            reference.remove(&expected.id);
+            assert_eq!(queue.pop(), Some(expected));
+            check(queue, reference);
+        }
+        assert!(queue.pop().is_none());
+        check(queue, reference);
     }
 }

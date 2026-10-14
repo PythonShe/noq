@@ -1410,6 +1410,51 @@ mod tests {
     }
 
     #[test]
+    fn reenqueue_stale_pending_stream() {
+        let mut server = make(Side::Server);
+        server.set_params(&TransportParameters {
+            initial_max_streams_bidi: 1u32.into(),
+            initial_max_data: 1000u32.into(),
+            initial_max_stream_data_bidi_remote: 1000u32.into(),
+            ..TransportParameters::default()
+        });
+        let (mut pending, state) = (Retransmits::default(), ConnState::established());
+        let id = Streams {
+            state: &mut server,
+            conn_state: &state,
+        }
+        .open(Dir::Bi)
+        .unwrap();
+        let write = |server: &mut StreamsState, pending: &mut Retransmits, data: &[u8]| {
+            SendStream {
+                id,
+                state: server,
+                pending,
+                conn_state: &state,
+            }
+            .write(data)
+            .unwrap();
+        };
+        write(&mut server, &mut pending, b"");
+        write(&mut server, &mut pending, b"");
+        write(&mut server, &mut pending, b"abc");
+        assert_eq!(server.pending.len(), 1);
+        let frames = server.write_frames_for_test(1000);
+        assert_eq!(frames.len(), 1);
+
+        server.retransmit(frames[0].clone());
+        server.received_ack_of(frames[0].clone());
+        assert_eq!(server.pending.len(), 1);
+        assert!(!server.can_send_stream_data(PathId::ZERO, true));
+        write(&mut server, &mut pending, b"def");
+        assert_eq!(server.pending.len(), 1);
+        let frames = server.write_frames_for_test(1000);
+        assert_eq!(frames.len(), 1);
+        assert_eq!(frames[0].offsets, 3..6);
+        assert_eq!(server.pending.len(), 0);
+    }
+
+    #[test]
     fn affinity_queues_share_priority_and_recency() {
         use crate::StreamAffinity::{Any, Sticky};
 
