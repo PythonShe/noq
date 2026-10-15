@@ -14,7 +14,10 @@ use tokio::{
     time::{Sleep, sleep_until},
 };
 
-use super::{AsyncTimer, AsyncUdpSocket, Runtime, UdpSenderHelper, UdpSenderHelperSocket};
+use super::{
+    AsyncTimer, AsyncUdpSocket, Runtime, SocketRouter, UdpSenderHelper, UdpSenderHelperSocket,
+    router,
+};
 
 /// A noq runtime for Tokio
 #[derive(Debug)]
@@ -30,10 +33,19 @@ impl Runtime for TokioRuntime {
     }
 
     fn wrap_udp_socket(&self, sock: std::net::UdpSocket) -> io::Result<Box<dyn AsyncUdpSocket>> {
-        Ok(Box::new(UdpSocket {
-            inner: Arc::new(udp::UdpSocketState::new((&sock).into())?),
-            io: Arc::new(tokio::net::UdpSocket::from_std(sock)?),
-        }))
+        Ok(Box::new(UdpSocket::new(sock)?))
+    }
+
+    #[allow(clippy::type_complexity)] // Same signature as the trait method.
+    fn wrap_udp_sockets(
+        &self,
+        sockets: Vec<(std::net::UdpSocket, Vec<ipnet::IpNet>)>,
+    ) -> io::Result<(Vec<Box<dyn AsyncUdpSocket>>, Arc<dyn SocketRouter>)> {
+        // Clones share the socket, so senders need no second file descriptor.
+        router::range_router(sockets, |socket| {
+            let socket = UdpSocket::new(socket)?;
+            Ok((Box::new(socket.clone()), Box::new(socket)))
+        })
     }
 
     fn now(&self) -> Instant {
@@ -54,6 +66,15 @@ impl AsyncTimer for Sleep {
 struct UdpSocket {
     io: Arc<tokio::net::UdpSocket>,
     inner: Arc<udp::UdpSocketState>,
+}
+
+impl UdpSocket {
+    fn new(sock: std::net::UdpSocket) -> io::Result<Self> {
+        Ok(Self {
+            inner: Arc::new(udp::UdpSocketState::new((&sock).into())?),
+            io: Arc::new(tokio::net::UdpSocket::from_std(sock)?),
+        })
+    }
 }
 
 impl UdpSenderHelperSocket for UdpSocket {

@@ -11,7 +11,10 @@ use async_io::Async;
 use async_io::Timer;
 
 use super::AsyncTimer;
-use super::{AsyncUdpSocket, Runtime, UdpSender, UdpSenderHelper, UdpSenderHelperSocket};
+use super::{
+    AsyncUdpSocket, Runtime, SocketRouter, UdpSender, UdpSenderHelper, UdpSenderHelperSocket,
+    router,
+};
 
 /// A noq runtime for smol
 #[derive(Debug)]
@@ -28,6 +31,18 @@ impl Runtime for SmolRuntime {
 
     fn wrap_udp_socket(&self, sock: std::net::UdpSocket) -> io::Result<Box<dyn AsyncUdpSocket>> {
         Ok(Box::new(UdpSocket::new(sock)?))
+    }
+
+    #[allow(clippy::type_complexity)] // Same signature as the trait method.
+    fn wrap_udp_sockets(
+        &self,
+        sockets: Vec<(std::net::UdpSocket, Vec<ipnet::IpNet>)>,
+    ) -> io::Result<(Vec<Box<dyn AsyncUdpSocket>>, Arc<dyn SocketRouter>)> {
+        // Clones share the socket, so senders need no second file descriptor.
+        router::range_router(sockets, |socket| {
+            let socket = UdpSocket::new(socket)?;
+            Ok((Box::new(socket.clone()), Box::new(socket)))
+        })
     }
 }
 

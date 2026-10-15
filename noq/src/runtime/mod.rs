@@ -4,13 +4,16 @@ use std::{
     fmt::{self, Debug},
     future::Future,
     io::{self, IoSliceMut},
-    net::SocketAddr,
+    net::{IpAddr, SocketAddr},
     num::NonZeroUsize,
     pin::Pin,
+    sync::atomic::{AtomicU64, Ordering},
     task::{Context, Poll},
     time::Duration,
 };
 
+#[cfg(not(wasm_browser))]
+use ipnet::IpNet;
 use udp::{RecvMeta, Transmit};
 
 use crate::Instant;
@@ -25,6 +28,33 @@ pub trait Runtime: Send + Sync + Debug + 'static {
     /// Convert `t` into the socket type used by this runtime
     #[cfg(not(wasm_browser))]
     fn wrap_udp_socket(&self, t: std::net::UdpSocket) -> io::Result<Box<dyn AsyncUdpSocket>>;
+    /// Wraps several sockets and creates a router over them
+    ///
+    /// `ranges` are the destinations of each socket. The longest matching range wins, and on
+    /// a tie the socket listed first. IPv4 ranges also match IPv4-mapped addresses. IPv6
+    /// ranges match IPv4-mapped addresses only inside `::ffff:0:0/96`, so a dual-stack socket
+    /// that should carry IPv4 lists that range too.
+    ///
+    /// Pass the result to [`Endpoint::new_with_multiple_sockets`].
+    ///
+    /// The default wraps each socket twice: once for receiving, and once through
+    /// [`std::net::UdpSocket::try_clone`] for creating senders.
+    ///
+    /// [`Endpoint::new_with_multiple_sockets`]: crate::Endpoint::new_with_multiple_sockets
+    #[cfg(not(wasm_browser))]
+    #[allow(clippy::type_complexity)] // A public type for the pair would only add API surface.
+    fn wrap_udp_sockets(
+        &self,
+        sockets: Vec<(std::net::UdpSocket, Vec<IpNet>)>,
+    ) -> io::Result<(
+        Vec<Box<dyn AsyncUdpSocket>>,
+        std::sync::Arc<dyn SocketRouter>,
+    )> {
+        router::range_router(sockets, |socket| {
+            let sender = self.wrap_udp_socket(socket.try_clone()?)?;
+            Ok((self.wrap_udp_socket(socket)?, sender))
+        })
+    }
     /// Look up the current time
     ///
     /// Allows simulating the flow of time for testing.
@@ -105,6 +135,55 @@ pub trait UdpSender: Send + Sync + Debug + 'static {
     fn max_transmit_segments(&self) -> NonZeroUsize {
         NonZeroUsize::MIN
     }
+}
+
+/// Identifies one socket for routing
+///
+/// Every call to [`SocketId::new`] returns an id different from all earlier ones, and ids are
+/// never reused. A connection caches one sender per id, so a new socket always gets a new
+/// sender.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SocketId(u64);
+
+impl SocketId {
+    /// The id of the socket of a single-socket endpoint, never returned by `new`
+    pub(crate) const SINGLE: Self = Self(0);
+
+    /// Creates a new id, different from every id created before
+    #[allow(clippy::new_without_default)] // A default id would hide that each call is unique.
+    pub fn new() -> Self {
+        static NEXT: AtomicU64 = AtomicU64::new(1);
+        Self(NEXT.fetch_add(1, Ordering::Relaxed))
+    }
+}
+
+/// Routes transmits to the sockets of an endpoint and creates the senders for them
+///
+/// An endpoint created with [`Endpoint::new_with_multiple_sockets`] asks its router for the
+/// socket of every transmit, and for the senders of its connections. It never calls
+/// [`AsyncUdpSocket::create_sender`] on its sockets, so each socket can belong to its receive
+/// task alone.
+///
+/// [`Endpoint::new_with_multiple_sockets`]: crate::Endpoint::new_with_multiple_sockets
+pub trait SocketRouter: Send + Sync + Debug + 'static {
+    /// Returns the socket that sends to `destination` from `src_ip`, or `None` to drop the
+    /// transmit
+    ///
+    /// Called for every path on each transmit attempt, so it must be cheap and must not lock.
+    /// For the same arguments it must return the same socket while a connection builds and
+    /// sends a transmit.
+    fn route(&self, destination: SocketAddr, src_ip: Option<IpAddr>) -> Option<SocketId>;
+
+    /// Creates a new sender for `socket`, with its own waker
+    ///
+    /// Called once per connection per socket, the first time [`route`] returns that socket.
+    /// Must handle every id that [`route`] returns. May lock.
+    ///
+    /// The sender gets destinations in the form the endpoint keeps them in: IPv4-mapped IPv6
+    /// if any socket of the endpoint is IPv6. It converts them as its socket needs.
+    ///
+    /// [`route`]: SocketRouter::route
+    fn create_sender(&self, socket: SocketId) -> Pin<Box<dyn UdpSender>>;
 }
 
 pin_project_lite::pin_project! {
@@ -279,6 +358,9 @@ pub fn default_runtime() -> Option<Arc<dyn Runtime>> {
     #[cfg(not(feature = "runtime-smol"))]
     None
 }
+
+#[cfg(not(wasm_browser))]
+mod router;
 
 #[cfg(feature = "runtime-tokio")]
 mod tokio;
