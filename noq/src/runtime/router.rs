@@ -125,3 +125,62 @@ impl UdpSender for Ipv4Sender {
         self.0.max_transmit_segments()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A router over `ranges`, one socket each, and the ids of the sockets
+    fn router(ranges: &[&str]) -> (RangeRouter, Vec<SocketId>) {
+        let ids: Vec<_> = ranges.iter().map(|_| SocketId::new()).collect();
+        let mut routes: Vec<_> = ranges
+            .iter()
+            .zip(&ids)
+            .map(|(range, id)| (range.parse().unwrap(), *id))
+            .collect();
+        routes.sort_by_key(|(range, _): &(IpNet, _)| std::cmp::Reverse(range.prefix_len()));
+        let router = RangeRouter {
+            routes: routes.into(),
+            senders: Box::new([]),
+        };
+        (router, ids)
+    }
+
+    fn route(router: &RangeRouter, dst: &str) -> Option<SocketId> {
+        router.route(dst.parse().unwrap(), None)
+    }
+
+    #[test]
+    fn route_contains_maps_ipv4() {
+        let v4: IpNet = "10.0.0.0/8".parse().unwrap();
+        let v6: IpNet = "fd15:70a:510b:1::/64".parse().unwrap();
+        assert!(route_contains(&v4, "10.1.2.3".parse().unwrap()));
+        assert!(route_contains(&v4, "::ffff:10.1.2.3".parse().unwrap()));
+        assert!(!route_contains(&v4, "11.1.2.3".parse().unwrap()));
+        assert!(!route_contains(&v4, "fd15:70a:510b:1::1".parse().unwrap()));
+        assert!(route_contains(&v6, "fd15:70a:510b:1::1".parse().unwrap()));
+        assert!(!route_contains(&v6, "fd15:70a:510b:2::1".parse().unwrap()));
+        assert!(!route_contains(&v6, "10.1.2.3".parse().unwrap()));
+        // Only a dual-stack range covers IPv4-mapped addresses.
+        let all_v6: IpNet = "::/0".parse().unwrap();
+        let dual_stack: IpNet = "::ffff:0:0/96".parse().unwrap();
+        assert!(!route_contains(&all_v6, "::ffff:10.1.2.3".parse().unwrap()));
+        assert!(route_contains(
+            &dual_stack,
+            "::ffff:10.1.2.3".parse().unwrap()
+        ));
+        assert!(route_contains(&all_v6, "2001:db8::1".parse().unwrap()));
+        assert!(!route_contains(&dual_stack, "2001:db8::1".parse().unwrap()));
+    }
+
+    #[test]
+    fn route_longest_prefix_then_order() {
+        let (router, ids) = router(&["0.0.0.0/0", "10.1.0.0/16", "0.0.0.0/0", "::/0"]);
+        assert_eq!(route(&router, "10.1.2.3:443"), Some(ids[1]));
+        assert_eq!(route(&router, "10.2.2.3:443"), Some(ids[0]));
+        assert_eq!(route(&router, "[::ffff:10.1.2.3]:443"), Some(ids[1]));
+        assert_eq!(route(&router, "[2001:db8::1]:443"), Some(ids[3]));
+        let (v4_only, _) = self::router(&["0.0.0.0/0"]);
+        assert_eq!(route(&v4_only, "[2001:db8::1]:443"), None);
+    }
+}

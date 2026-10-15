@@ -114,3 +114,81 @@ impl UdpSender for ConnectionSender {
         this.poll_send_on(socket, transmit, cx)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Mutex;
+
+    use super::*;
+
+    /// A sender with a fixed segment limit that never sends
+    #[derive(Debug)]
+    struct LimitSender(NonZeroUsize);
+
+    impl UdpSender for LimitSender {
+        fn poll_send(
+            self: Pin<&mut Self>,
+            _transmit: &Transmit<'_>,
+            _cx: &mut Context<'_>,
+        ) -> Poll<io::Result<()>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn max_transmit_segments(&self) -> NonZeroUsize {
+            self.0
+        }
+    }
+
+    /// Routes IPv4 to one socket and IPv6 to another, with different segment limits
+    #[derive(Debug)]
+    struct FamilyRouter {
+        v4: SocketId,
+        v6: SocketId,
+        created: Mutex<Vec<SocketId>>,
+    }
+
+    impl SocketRouter for FamilyRouter {
+        fn route(&self, destination: SocketAddr, _src_ip: Option<IpAddr>) -> Option<SocketId> {
+            Some(match destination {
+                SocketAddr::V4(_) => self.v4,
+                SocketAddr::V6(_) => self.v6,
+            })
+        }
+
+        fn create_sender(&self, socket: SocketId) -> Pin<Box<dyn UdpSender>> {
+            self.created.lock().unwrap().push(socket);
+            let segments = if socket == self.v4 { 1 } else { 10 };
+            Box::pin(LimitSender(NonZeroUsize::new(segments).unwrap()))
+        }
+    }
+
+    #[test]
+    fn route_uses_each_sockets_segment_limit() {
+        let router = Arc::new(FamilyRouter {
+            v4: SocketId::new(),
+            v6: SocketId::new(),
+            created: Mutex::new(Vec::new()),
+        });
+        let mut sender = ConnectionSender::routed(router.clone());
+        let v4 = "127.0.0.1:1".parse().unwrap();
+        let v6 = "[::1]:1".parse().unwrap();
+
+        assert_eq!(sender.route(v4, None), Some((router.v4, NonZeroUsize::MIN)));
+        assert_eq!(
+            sender.route(v6, None),
+            Some((router.v6, NonZeroUsize::new(10).unwrap()))
+        );
+        // Senders are created once per socket, on first use.
+        sender.route(v4, None);
+        sender.route(v6, None);
+        assert_eq!(*router.created.lock().unwrap(), [router.v4, router.v6]);
+    }
+
+    #[test]
+    fn socket_ids_are_unique() {
+        let ids: Vec<_> = (0..100).map(|_| SocketId::new()).collect();
+        let unique: std::collections::HashSet<_> = ids.iter().collect();
+        assert_eq!(unique.len(), ids.len());
+        assert!(!ids.contains(&SocketId::SINGLE));
+    }
+}
