@@ -525,13 +525,13 @@
 <a href=#525 id=525 data-nosnippet>525</a>        builder: <span class="kw-2">&amp;mut </span>PacketBuilder&lt;<span class="lifetime">'a</span>, <span class="lifetime">'b</span>&gt;,
 <a href=#526 id=526 data-nosnippet>526</a>        stats: <span class="kw-2">&amp;mut </span>FrameStats,
 <a href=#527 id=527 data-nosnippet>527</a>        path: PathId,
-<a href=#528 id=528 data-nosnippet>528</a>        status_allows_data: bool,
+<a href=#528 id=528 data-nosnippet>528</a>        include_affinity_any: bool,
 <a href=#529 id=529 data-nosnippet>529</a>    ) {
 <a href=#530 id=530 data-nosnippet>530</a>        <span class="kw">while </span>builder.frame_space_remaining() &gt; frame::Stream::SIZE_BOUND {
 <a href=#531 id=531 data-nosnippet>531</a>            <span class="comment">// Pop the stream of the highest priority that currently has pending data. If
 <a href=#532 id=532 data-nosnippet>532</a>            // the stream still has some pending data left after writing, it will be
 <a href=#533 id=533 data-nosnippet>533</a>            // reinserted, otherwise not
-<a href=#534 id=534 data-nosnippet>534</a>            </span><span class="kw">let </span><span class="prelude-val">Some</span>(pending) = <span class="self">self</span>.pending.pop(path, status_allows_data) <span class="kw">else </span>{
+<a href=#534 id=534 data-nosnippet>534</a>            </span><span class="kw">let </span><span class="prelude-val">Some</span>(pending) = <span class="self">self</span>.pending.pop(path, include_affinity_any) <span class="kw">else </span>{
 <a href=#535 id=535 data-nosnippet>535</a>                <span class="kw">break</span>;
 <a href=#536 id=536 data-nosnippet>536</a>            };
 <a href=#537 id=537 data-nosnippet>537</a>
