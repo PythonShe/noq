@@ -426,15 +426,6 @@ impl Endpoint {
         }
     }
 
-    /// Create a sender over the endpoint's sockets
-    ///
-    /// Transmits are routed to a socket like a connection's transmits. This allows sending
-    /// datagrams outside of a connection, for example to race a connection attempt over
-    /// several transports.
-    pub fn create_sender(&self) -> Pin<Box<dyn UdpSender>> {
-        Box::pin(self.inner.state.lock().unwrap().create_sender())
-    }
-
     /// Get the number of connections that are currently open
     pub fn open_connections(&self) -> usize {
         self.inner.state.lock().unwrap().inner.open_connections()

@@ -98,7 +98,7 @@ impl fmt::Debug for ConnectionSender {
     }
 }
 
-/// Routes, then sends, for senders used outside a connection
+/// Routes, then sends, for the endpoint's own responses outside a connection
 impl UdpSender for ConnectionSender {
     fn poll_send(
         self: Pin<&mut Self>,
