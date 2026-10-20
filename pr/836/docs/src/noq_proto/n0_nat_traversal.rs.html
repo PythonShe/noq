@@ -1,19 +1,19 @@
 <!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `noq-proto/src/n0_nat_traversal.rs`."><title>n0_nat_traversal.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-ca0dd0c4.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="noq_proto" data-themes="" data-resource-suffix="" data-rustdoc-version="1.92.0-nightly (b6f0945e4 2025-10-08)" data-channel="nightly" data-search-js="search-8d3311b9.js" data-stringdex-js="stringdex-828709d0.js" data-settings-js="settings-c38705f0.js" ><script src="../../static.files/storage-e2aeef58.js"></script><script defer src="../../static.files/src-script-813739b1.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-ce535bd0.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-263c88ec.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">noq_proto/</div>n0_nat_traversal.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-4"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! n0's (&lt;https://n0.computer&gt;) NAT Traversal protocol implementation.
 <a href=#2 id=2 data-nosnippet>2</a>
-<a href=#3 id=3 data-nosnippet>3</a></span><span class="kw">use </span>std::{
-<a href=#4 id=4 data-nosnippet>4</a>    collections::hash_map::Entry,
+<a href=#3 id=3 data-nosnippet>3</a></span><span class="kw">use </span>alloc::vec::Vec;
+<a href=#4 id=4 data-nosnippet>4</a><span class="kw">use </span>core::{
 <a href=#5 id=5 data-nosnippet>5</a>    fmt::Display,
 <a href=#6 id=6 data-nosnippet>6</a>    net::{IpAddr, SocketAddr},
 <a href=#7 id=7 data-nosnippet>7</a>    time::Duration,
 <a href=#8 id=8 data-nosnippet>8</a>};
 <a href=#9 id=9 data-nosnippet>9</a>
-<a href=#10 id=10 data-nosnippet>10</a><span class="kw">use </span>rustc_hash::{FxHashMap, FxHashSet};
-<a href=#11 id=11 data-nosnippet>11</a><span class="kw">use </span>tracing::{debug, trace};
-<a href=#12 id=12 data-nosnippet>12</a>
-<a href=#13 id=13 data-nosnippet>13</a><span class="kw">use crate</span>::{
-<a href=#14 id=14 data-nosnippet>14</a>    FourTuple, Side, VarInt,
-<a href=#15 id=15 data-nosnippet>15</a>    connection::spaces::PendingReachOutFrames,
-<a href=#16 id=16 data-nosnippet>16</a>    frame::{AddAddress, ReachOut, RemoveAddress},
+<a href=#10 id=10 data-nosnippet>10</a><span class="kw">use </span>tracing::{debug, trace};
+<a href=#11 id=11 data-nosnippet>11</a>
+<a href=#12 id=12 data-nosnippet>12</a><span class="kw">use crate</span>::{
+<a href=#13 id=13 data-nosnippet>13</a>    FourTuple, FxHashMap, FxHashSet, Side, VarInt,
+<a href=#14 id=14 data-nosnippet>14</a>    connection::spaces::PendingReachOutFrames,
+<a href=#15 id=15 data-nosnippet>15</a>    frame::{AddAddress, ReachOut, RemoveAddress},
+<a href=#16 id=16 data-nosnippet>16</a>    hash_map::Entry,
 <a href=#17 id=17 data-nosnippet>17</a>};
 <a href=#18 id=18 data-nosnippet>18</a>
 <a href=#19 id=19 data-nosnippet>19</a><span class="doccomment">/// Maximum number of times we send a NAT probe to the same remote address in a round.
@@ -86,7 +86,7 @@
 <a href=#86 id=86 data-nosnippet>86</a>}
 <a href=#87 id=87 data-nosnippet>87</a>
 <a href=#88 id=88 data-nosnippet>88</a><span class="kw">impl </span>Display <span class="kw">for </span>CanonicalIpPort {
-<a href=#89 id=89 data-nosnippet>89</a>    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>std::fmt::Formatter&lt;<span class="lifetime">'_</span>&gt;) -&gt; std::fmt::Result {
+<a href=#89 id=89 data-nosnippet>89</a>    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>core::fmt::Formatter&lt;<span class="lifetime">'_</span>&gt;) -&gt; core::fmt::Result {
 <a href=#90 id=90 data-nosnippet>90</a>        <span class="self">self</span>.as_canonical_addr().fmt(f)
 <a href=#91 id=91 data-nosnippet>91</a>    }
 <a href=#92 id=92 data-nosnippet>92</a>}
@@ -891,185 +891,187 @@
 <a href=#891 id=891 data-nosnippet>891</a>
 <a href=#892 id=892 data-nosnippet>892</a><span class="attr">#[cfg(test)]
 <a href=#893 id=893 data-nosnippet>893</a></span><span class="kw">mod </span>tests {
-<a href=#894 id=894 data-nosnippet>894</a>    <span class="kw">use </span>testresult::TestResult;
+<a href=#894 id=894 data-nosnippet>894</a>    <span class="kw">use </span>std::dbg;
 <a href=#895 id=895 data-nosnippet>895</a>
-<a href=#896 id=896 data-nosnippet>896</a>    <span class="kw">use super</span>::<span class="kw-2">*</span>;
+<a href=#896 id=896 data-nosnippet>896</a>    <span class="kw">use </span>testresult::TestResult;
 <a href=#897 id=897 data-nosnippet>897</a>
-<a href=#898 id=898 data-nosnippet>898</a>    <span class="attr">#[test]
-<a href=#899 id=899 data-nosnippet>899</a>    </span><span class="kw">fn </span>test_basic_server_state() {
-<a href=#900 id=900 data-nosnippet>900</a>        <span class="kw">let </span><span class="kw-2">mut </span>state = ServerState::new(<span class="number">2</span>, <span class="number">2</span>);
-<a href=#901 id=901 data-nosnippet>901</a>
-<a href=#902 id=902 data-nosnippet>902</a>        state
-<a href=#903 id=903 data-nosnippet>903</a>            .handle_reach_out(
-<a href=#904 id=904 data-nosnippet>904</a>                ReachOut {
-<a href=#905 id=905 data-nosnippet>905</a>                    round: <span class="number">1u32</span>.into(),
-<a href=#906 id=906 data-nosnippet>906</a>                    ip: std::net::Ipv4Addr::LOCALHOST.into(),
-<a href=#907 id=907 data-nosnippet>907</a>                    port: <span class="number">1</span>,
-<a href=#908 id=908 data-nosnippet>908</a>                },
-<a href=#909 id=909 data-nosnippet>909</a>                <span class="bool-val">true</span>,
-<a href=#910 id=910 data-nosnippet>910</a>            )
-<a href=#911 id=911 data-nosnippet>911</a>            .unwrap();
-<a href=#912 id=912 data-nosnippet>912</a>
-<a href=#913 id=913 data-nosnippet>913</a>        state
-<a href=#914 id=914 data-nosnippet>914</a>            .handle_reach_out(
-<a href=#915 id=915 data-nosnippet>915</a>                ReachOut {
-<a href=#916 id=916 data-nosnippet>916</a>                    round: <span class="number">1u32</span>.into(),
-<a href=#917 id=917 data-nosnippet>917</a>                    ip: <span class="string">"1.1.1.1"</span>.parse().unwrap(), <span class="comment">//std::net::Ipv4Addr::LOCALHOST.into(),
-<a href=#918 id=918 data-nosnippet>918</a>                    </span>port: <span class="number">2</span>,
-<a href=#919 id=919 data-nosnippet>919</a>                },
-<a href=#920 id=920 data-nosnippet>920</a>                <span class="bool-val">true</span>,
-<a href=#921 id=921 data-nosnippet>921</a>            )
-<a href=#922 id=922 data-nosnippet>922</a>            .unwrap();
-<a href=#923 id=923 data-nosnippet>923</a>
-<a href=#924 id=924 data-nosnippet>924</a>        <span class="macro">dbg!</span>(<span class="kw-2">&amp;</span>state);
-<a href=#925 id=925 data-nosnippet>925</a>        <span class="macro">assert_eq!</span>(state.pending_probes.len(), <span class="number">2</span>);
-<a href=#926 id=926 data-nosnippet>926</a>
-<a href=#927 id=927 data-nosnippet>927</a>        <span class="comment">// Helper: send next ready probe
-<a href=#928 id=928 data-nosnippet>928</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>challenge = <span class="number">0</span>;
-<a href=#929 id=929 data-nosnippet>929</a>        <span class="kw">let </span><span class="kw-2">mut </span>send_probe = |state: <span class="kw-2">&amp;mut </span>ServerState| {
-<a href=#930 id=930 data-nosnippet>930</a>            <span class="kw">let </span>remote = state.next_probe_addr().unwrap();
-<a href=#931 id=931 data-nosnippet>931</a>            challenge += <span class="number">1</span>;
-<a href=#932 id=932 data-nosnippet>932</a>            state.mark_probe_sent(remote, challenge);
-<a href=#933 id=933 data-nosnippet>933</a>        };
-<a href=#934 id=934 data-nosnippet>934</a>
-<a href=#935 id=935 data-nosnippet>935</a>        send_probe(<span class="kw-2">&amp;mut </span>state);
-<a href=#936 id=936 data-nosnippet>936</a>        send_probe(<span class="kw-2">&amp;mut </span>state);
-<a href=#937 id=937 data-nosnippet>937</a>
-<a href=#938 id=938 data-nosnippet>938</a>        <span class="comment">// After sending both probes, no ready probes remain but they're still tracked.
-<a href=#939 id=939 data-nosnippet>939</a>        </span><span class="macro">assert!</span>(state.next_probe_addr().is_none());
-<a href=#940 id=940 data-nosnippet>940</a>
-<a href=#941 id=941 data-nosnippet>941</a>        <span class="comment">// After queuing retries, probes become available again
-<a href=#942 id=942 data-nosnippet>942</a>        </span>state.queue_retries();
-<a href=#943 id=943 data-nosnippet>943</a>        send_probe(<span class="kw-2">&amp;mut </span>state);
-<a href=#944 id=944 data-nosnippet>944</a>        send_probe(<span class="kw-2">&amp;mut </span>state);
-<a href=#945 id=945 data-nosnippet>945</a>
-<a href=#946 id=946 data-nosnippet>946</a>        <span class="comment">// After 2 attempts each, retries still available (max is 10)
-<a href=#947 id=947 data-nosnippet>947</a>        </span>state.queue_retries();
-<a href=#948 id=948 data-nosnippet>948</a>        send_probe(<span class="kw-2">&amp;mut </span>state);
-<a href=#949 id=949 data-nosnippet>949</a>        send_probe(<span class="kw-2">&amp;mut </span>state);
-<a href=#950 id=950 data-nosnippet>950</a>
-<a href=#951 id=951 data-nosnippet>951</a>        <span class="comment">// Exhaust remaining attempts
-<a href=#952 id=952 data-nosnippet>952</a>        </span><span class="kw">for _ in </span><span class="number">3</span>..MAX_NAT_PROBE_ATTEMPTS {
-<a href=#953 id=953 data-nosnippet>953</a>            state.queue_retries();
-<a href=#954 id=954 data-nosnippet>954</a>            send_probe(<span class="kw-2">&amp;mut </span>state);
-<a href=#955 id=955 data-nosnippet>955</a>            send_probe(<span class="kw-2">&amp;mut </span>state);
-<a href=#956 id=956 data-nosnippet>956</a>        }
-<a href=#957 id=957 data-nosnippet>957</a>
-<a href=#958 id=958 data-nosnippet>958</a>        <span class="comment">// After max attempts, probes are removed
-<a href=#959 id=959 data-nosnippet>959</a>        </span>state.queue_retries();
-<a href=#960 id=960 data-nosnippet>960</a>        <span class="macro">assert!</span>(state.next_probe_addr().is_none());
-<a href=#961 id=961 data-nosnippet>961</a>    }
-<a href=#962 id=962 data-nosnippet>962</a>
-<a href=#963 id=963 data-nosnippet>963</a>    <span class="attr">#[test]
-<a href=#964 id=964 data-nosnippet>964</a>    </span><span class="kw">fn </span>test_map_to_local_socket() {
-<a href=#965 id=965 data-nosnippet>965</a>        <span class="macro">assert_eq!</span>(
-<a href=#966 id=966 data-nosnippet>966</a>            map_to_local_socket_family(<span class="string">"1.1.1.1"</span>.parse().unwrap(), <span class="bool-val">false</span>),
-<a href=#967 id=967 data-nosnippet>967</a>            <span class="prelude-val">Some</span>(<span class="string">"1.1.1.1"</span>.parse().unwrap())
-<a href=#968 id=968 data-nosnippet>968</a>        );
-<a href=#969 id=969 data-nosnippet>969</a>        <span class="macro">assert_eq!</span>(
-<a href=#970 id=970 data-nosnippet>970</a>            map_to_local_socket_family(<span class="string">"1.1.1.1"</span>.parse().unwrap(), <span class="bool-val">true</span>),
-<a href=#971 id=971 data-nosnippet>971</a>            <span class="prelude-val">Some</span>(<span class="string">"::ffff:1.1.1.1"</span>.parse().unwrap())
-<a href=#972 id=972 data-nosnippet>972</a>        );
-<a href=#973 id=973 data-nosnippet>973</a>        <span class="macro">assert_eq!</span>(
-<a href=#974 id=974 data-nosnippet>974</a>            map_to_local_socket_family(<span class="string">"::1"</span>.parse().unwrap(), <span class="bool-val">true</span>),
-<a href=#975 id=975 data-nosnippet>975</a>            <span class="prelude-val">Some</span>(<span class="string">"::1"</span>.parse().unwrap())
-<a href=#976 id=976 data-nosnippet>976</a>        );
-<a href=#977 id=977 data-nosnippet>977</a>        <span class="macro">assert_eq!</span>(
-<a href=#978 id=978 data-nosnippet>978</a>            map_to_local_socket_family(<span class="string">"::1"</span>.parse().unwrap(), <span class="bool-val">false</span>),
-<a href=#979 id=979 data-nosnippet>979</a>            <span class="prelude-val">None
-<a href=#980 id=980 data-nosnippet>980</a>        </span>);
-<a href=#981 id=981 data-nosnippet>981</a>        <span class="macro">assert_eq!</span>(
-<a href=#982 id=982 data-nosnippet>982</a>            map_to_local_socket_family(<span class="string">"::ffff:1.1.1.1"</span>.parse().unwrap(), <span class="bool-val">false</span>),
-<a href=#983 id=983 data-nosnippet>983</a>            <span class="prelude-val">Some</span>(<span class="string">"1.1.1.1"</span>.parse().unwrap())
-<a href=#984 id=984 data-nosnippet>984</a>        )
-<a href=#985 id=985 data-nosnippet>985</a>    }
-<a href=#986 id=986 data-nosnippet>986</a>
-<a href=#987 id=987 data-nosnippet>987</a>    <span class="attr">#[test]
-<a href=#988 id=988 data-nosnippet>988</a>    </span><span class="kw">fn </span>test_retry_delay_server_ipv6() -&gt; TestResult {
-<a href=#989 id=989 data-nosnippet>989</a>        <span class="kw">let </span>initial_rtt = Duration::from_millis(<span class="number">333</span>);
-<a href=#990 id=990 data-nosnippet>990</a>        <span class="kw">let </span>ipv6 = <span class="bool-val">true</span>;
-<a href=#991 id=991 data-nosnippet>991</a>        <span class="kw">let </span>remote = SocketAddr::from((<span class="string">"::2"</span>.parse::&lt;IpAddr&gt;()<span class="question-mark">?</span>, <span class="number">2</span>));
-<a href=#992 id=992 data-nosnippet>992</a>        <span class="kw">let </span>remote_ipp = (remote.ip(), remote.port());
-<a href=#993 id=993 data-nosnippet>993</a>
-<a href=#994 id=994 data-nosnippet>994</a>        <span class="kw">let </span><span class="kw-2">mut </span>nat = State::new(<span class="number">8</span>, <span class="number">8</span>, Side::Server);
+<a href=#898 id=898 data-nosnippet>898</a>    <span class="kw">use super</span>::<span class="kw-2">*</span>;
+<a href=#899 id=899 data-nosnippet>899</a>
+<a href=#900 id=900 data-nosnippet>900</a>    <span class="attr">#[test]
+<a href=#901 id=901 data-nosnippet>901</a>    </span><span class="kw">fn </span>test_basic_server_state() {
+<a href=#902 id=902 data-nosnippet>902</a>        <span class="kw">let </span><span class="kw-2">mut </span>state = ServerState::new(<span class="number">2</span>, <span class="number">2</span>);
+<a href=#903 id=903 data-nosnippet>903</a>
+<a href=#904 id=904 data-nosnippet>904</a>        state
+<a href=#905 id=905 data-nosnippet>905</a>            .handle_reach_out(
+<a href=#906 id=906 data-nosnippet>906</a>                ReachOut {
+<a href=#907 id=907 data-nosnippet>907</a>                    round: <span class="number">1u32</span>.into(),
+<a href=#908 id=908 data-nosnippet>908</a>                    ip: core::net::Ipv4Addr::LOCALHOST.into(),
+<a href=#909 id=909 data-nosnippet>909</a>                    port: <span class="number">1</span>,
+<a href=#910 id=910 data-nosnippet>910</a>                },
+<a href=#911 id=911 data-nosnippet>911</a>                <span class="bool-val">true</span>,
+<a href=#912 id=912 data-nosnippet>912</a>            )
+<a href=#913 id=913 data-nosnippet>913</a>            .unwrap();
+<a href=#914 id=914 data-nosnippet>914</a>
+<a href=#915 id=915 data-nosnippet>915</a>        state
+<a href=#916 id=916 data-nosnippet>916</a>            .handle_reach_out(
+<a href=#917 id=917 data-nosnippet>917</a>                ReachOut {
+<a href=#918 id=918 data-nosnippet>918</a>                    round: <span class="number">1u32</span>.into(),
+<a href=#919 id=919 data-nosnippet>919</a>                    ip: <span class="string">"1.1.1.1"</span>.parse().unwrap(), <span class="comment">//core::net::Ipv4Addr::LOCALHOST.into(),
+<a href=#920 id=920 data-nosnippet>920</a>                    </span>port: <span class="number">2</span>,
+<a href=#921 id=921 data-nosnippet>921</a>                },
+<a href=#922 id=922 data-nosnippet>922</a>                <span class="bool-val">true</span>,
+<a href=#923 id=923 data-nosnippet>923</a>            )
+<a href=#924 id=924 data-nosnippet>924</a>            .unwrap();
+<a href=#925 id=925 data-nosnippet>925</a>
+<a href=#926 id=926 data-nosnippet>926</a>        <span class="macro">dbg!</span>(<span class="kw-2">&amp;</span>state);
+<a href=#927 id=927 data-nosnippet>927</a>        <span class="macro">assert_eq!</span>(state.pending_probes.len(), <span class="number">2</span>);
+<a href=#928 id=928 data-nosnippet>928</a>
+<a href=#929 id=929 data-nosnippet>929</a>        <span class="comment">// Helper: send next ready probe
+<a href=#930 id=930 data-nosnippet>930</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>challenge = <span class="number">0</span>;
+<a href=#931 id=931 data-nosnippet>931</a>        <span class="kw">let </span><span class="kw-2">mut </span>send_probe = |state: <span class="kw-2">&amp;mut </span>ServerState| {
+<a href=#932 id=932 data-nosnippet>932</a>            <span class="kw">let </span>remote = state.next_probe_addr().unwrap();
+<a href=#933 id=933 data-nosnippet>933</a>            challenge += <span class="number">1</span>;
+<a href=#934 id=934 data-nosnippet>934</a>            state.mark_probe_sent(remote, challenge);
+<a href=#935 id=935 data-nosnippet>935</a>        };
+<a href=#936 id=936 data-nosnippet>936</a>
+<a href=#937 id=937 data-nosnippet>937</a>        send_probe(<span class="kw-2">&amp;mut </span>state);
+<a href=#938 id=938 data-nosnippet>938</a>        send_probe(<span class="kw-2">&amp;mut </span>state);
+<a href=#939 id=939 data-nosnippet>939</a>
+<a href=#940 id=940 data-nosnippet>940</a>        <span class="comment">// After sending both probes, no ready probes remain but they're still tracked.
+<a href=#941 id=941 data-nosnippet>941</a>        </span><span class="macro">assert!</span>(state.next_probe_addr().is_none());
+<a href=#942 id=942 data-nosnippet>942</a>
+<a href=#943 id=943 data-nosnippet>943</a>        <span class="comment">// After queuing retries, probes become available again
+<a href=#944 id=944 data-nosnippet>944</a>        </span>state.queue_retries();
+<a href=#945 id=945 data-nosnippet>945</a>        send_probe(<span class="kw-2">&amp;mut </span>state);
+<a href=#946 id=946 data-nosnippet>946</a>        send_probe(<span class="kw-2">&amp;mut </span>state);
+<a href=#947 id=947 data-nosnippet>947</a>
+<a href=#948 id=948 data-nosnippet>948</a>        <span class="comment">// After 2 attempts each, retries still available (max is 10)
+<a href=#949 id=949 data-nosnippet>949</a>        </span>state.queue_retries();
+<a href=#950 id=950 data-nosnippet>950</a>        send_probe(<span class="kw-2">&amp;mut </span>state);
+<a href=#951 id=951 data-nosnippet>951</a>        send_probe(<span class="kw-2">&amp;mut </span>state);
+<a href=#952 id=952 data-nosnippet>952</a>
+<a href=#953 id=953 data-nosnippet>953</a>        <span class="comment">// Exhaust remaining attempts
+<a href=#954 id=954 data-nosnippet>954</a>        </span><span class="kw">for _ in </span><span class="number">3</span>..MAX_NAT_PROBE_ATTEMPTS {
+<a href=#955 id=955 data-nosnippet>955</a>            state.queue_retries();
+<a href=#956 id=956 data-nosnippet>956</a>            send_probe(<span class="kw-2">&amp;mut </span>state);
+<a href=#957 id=957 data-nosnippet>957</a>            send_probe(<span class="kw-2">&amp;mut </span>state);
+<a href=#958 id=958 data-nosnippet>958</a>        }
+<a href=#959 id=959 data-nosnippet>959</a>
+<a href=#960 id=960 data-nosnippet>960</a>        <span class="comment">// After max attempts, probes are removed
+<a href=#961 id=961 data-nosnippet>961</a>        </span>state.queue_retries();
+<a href=#962 id=962 data-nosnippet>962</a>        <span class="macro">assert!</span>(state.next_probe_addr().is_none());
+<a href=#963 id=963 data-nosnippet>963</a>    }
+<a href=#964 id=964 data-nosnippet>964</a>
+<a href=#965 id=965 data-nosnippet>965</a>    <span class="attr">#[test]
+<a href=#966 id=966 data-nosnippet>966</a>    </span><span class="kw">fn </span>test_map_to_local_socket() {
+<a href=#967 id=967 data-nosnippet>967</a>        <span class="macro">assert_eq!</span>(
+<a href=#968 id=968 data-nosnippet>968</a>            map_to_local_socket_family(<span class="string">"1.1.1.1"</span>.parse().unwrap(), <span class="bool-val">false</span>),
+<a href=#969 id=969 data-nosnippet>969</a>            <span class="prelude-val">Some</span>(<span class="string">"1.1.1.1"</span>.parse().unwrap())
+<a href=#970 id=970 data-nosnippet>970</a>        );
+<a href=#971 id=971 data-nosnippet>971</a>        <span class="macro">assert_eq!</span>(
+<a href=#972 id=972 data-nosnippet>972</a>            map_to_local_socket_family(<span class="string">"1.1.1.1"</span>.parse().unwrap(), <span class="bool-val">true</span>),
+<a href=#973 id=973 data-nosnippet>973</a>            <span class="prelude-val">Some</span>(<span class="string">"::ffff:1.1.1.1"</span>.parse().unwrap())
+<a href=#974 id=974 data-nosnippet>974</a>        );
+<a href=#975 id=975 data-nosnippet>975</a>        <span class="macro">assert_eq!</span>(
+<a href=#976 id=976 data-nosnippet>976</a>            map_to_local_socket_family(<span class="string">"::1"</span>.parse().unwrap(), <span class="bool-val">true</span>),
+<a href=#977 id=977 data-nosnippet>977</a>            <span class="prelude-val">Some</span>(<span class="string">"::1"</span>.parse().unwrap())
+<a href=#978 id=978 data-nosnippet>978</a>        );
+<a href=#979 id=979 data-nosnippet>979</a>        <span class="macro">assert_eq!</span>(
+<a href=#980 id=980 data-nosnippet>980</a>            map_to_local_socket_family(<span class="string">"::1"</span>.parse().unwrap(), <span class="bool-val">false</span>),
+<a href=#981 id=981 data-nosnippet>981</a>            <span class="prelude-val">None
+<a href=#982 id=982 data-nosnippet>982</a>        </span>);
+<a href=#983 id=983 data-nosnippet>983</a>        <span class="macro">assert_eq!</span>(
+<a href=#984 id=984 data-nosnippet>984</a>            map_to_local_socket_family(<span class="string">"::ffff:1.1.1.1"</span>.parse().unwrap(), <span class="bool-val">false</span>),
+<a href=#985 id=985 data-nosnippet>985</a>            <span class="prelude-val">Some</span>(<span class="string">"1.1.1.1"</span>.parse().unwrap())
+<a href=#986 id=986 data-nosnippet>986</a>        )
+<a href=#987 id=987 data-nosnippet>987</a>    }
+<a href=#988 id=988 data-nosnippet>988</a>
+<a href=#989 id=989 data-nosnippet>989</a>    <span class="attr">#[test]
+<a href=#990 id=990 data-nosnippet>990</a>    </span><span class="kw">fn </span>test_retry_delay_server_ipv6() -&gt; TestResult {
+<a href=#991 id=991 data-nosnippet>991</a>        <span class="kw">let </span>initial_rtt = Duration::from_millis(<span class="number">333</span>);
+<a href=#992 id=992 data-nosnippet>992</a>        <span class="kw">let </span>ipv6 = <span class="bool-val">true</span>;
+<a href=#993 id=993 data-nosnippet>993</a>        <span class="kw">let </span>remote = SocketAddr::from((<span class="string">"::2"</span>.parse::&lt;IpAddr&gt;()<span class="question-mark">?</span>, <span class="number">2</span>));
+<a href=#994 id=994 data-nosnippet>994</a>        <span class="kw">let </span>remote_ipp = (remote.ip(), remote.port());
 <a href=#995 id=995 data-nosnippet>995</a>
-<a href=#996 id=996 data-nosnippet>996</a>        nat.server_side_mut()<span class="question-mark">?</span>.handle_reach_out(
-<a href=#997 id=997 data-nosnippet>997</a>            ReachOut {
-<a href=#998 id=998 data-nosnippet>998</a>                round: <span class="number">1u8</span>.into(),
-<a href=#999 id=999 data-nosnippet>999</a>                ip: remote.ip(),
-<a href=#1000 id=1000 data-nosnippet>1000</a>                port: remote.port(),
-<a href=#1001 id=1001 data-nosnippet>1001</a>            },
-<a href=#1002 id=1002 data-nosnippet>1002</a>            ipv6,
-<a href=#1003 id=1003 data-nosnippet>1003</a>        )<span class="question-mark">?</span>;
-<a href=#1004 id=1004 data-nosnippet>1004</a>
-<a href=#1005 id=1005 data-nosnippet>1005</a>        <span class="kw">let </span>challenges = [<span class="number">1u64</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>, <span class="number">7</span>];
-<a href=#1006 id=1006 data-nosnippet>1006</a>        <span class="kw">let </span>delays = [
-<a href=#1007 id=1007 data-nosnippet>1007</a>            <span class="number">33_300u64</span>, <span class="number">66_600</span>, <span class="number">133_200</span>, <span class="number">266_400</span>, <span class="number">532_800</span>, <span class="number">1_065_600</span>, <span class="number">2_000_000</span>,
-<a href=#1008 id=1008 data-nosnippet>1008</a>        ];
-<a href=#1009 id=1009 data-nosnippet>1009</a>        <span class="kw">for </span>(challenge, delay) <span class="kw">in </span>challenges.into_iter().zip(delays) {
-<a href=#1010 id=1010 data-nosnippet>1010</a>            nat.queue_retries(ipv6);
-<a href=#1011 id=1011 data-nosnippet>1011</a>            <span class="macro">assert_eq!</span>(nat.next_probe_addr(), <span class="prelude-val">Some</span>(remote_ipp));
-<a href=#1012 id=1012 data-nosnippet>1012</a>            nat.mark_probe_sent(remote_ipp, challenge);
-<a href=#1013 id=1013 data-nosnippet>1013</a>            <span class="macro">assert_eq!</span>(
-<a href=#1014 id=1014 data-nosnippet>1014</a>                nat.retry_delay(initial_rtt),
-<a href=#1015 id=1015 data-nosnippet>1015</a>                <span class="prelude-val">Some</span>(Duration::from_micros(delay)),
-<a href=#1016 id=1016 data-nosnippet>1016</a>                <span class="string">"challenge: {challenge}"
-<a href=#1017 id=1017 data-nosnippet>1017</a>            </span>);
-<a href=#1018 id=1018 data-nosnippet>1018</a>        }
-<a href=#1019 id=1019 data-nosnippet>1019</a>
-<a href=#1020 id=1020 data-nosnippet>1020</a>        <span class="macro">assert!</span>(nat.handle_path_response(
-<a href=#1021 id=1021 data-nosnippet>1021</a>            FourTuple {
-<a href=#1022 id=1022 data-nosnippet>1022</a>                remote,
-<a href=#1023 id=1023 data-nosnippet>1023</a>                local_ip: <span class="prelude-val">Some</span>(<span class="string">"::3"</span>.parse::&lt;IpAddr&gt;()<span class="question-mark">?</span>),
-<a href=#1024 id=1024 data-nosnippet>1024</a>            },
-<a href=#1025 id=1025 data-nosnippet>1025</a>            challenges[<span class="number">6</span>]
-<a href=#1026 id=1026 data-nosnippet>1026</a>        ));
-<a href=#1027 id=1027 data-nosnippet>1027</a>        <span class="macro">assert_eq!</span>(nat.retry_delay(initial_rtt), <span class="prelude-val">None</span>);
-<a href=#1028 id=1028 data-nosnippet>1028</a>
-<a href=#1029 id=1029 data-nosnippet>1029</a>        <span class="prelude-val">Ok</span>(())
-<a href=#1030 id=1030 data-nosnippet>1030</a>    }
-<a href=#1031 id=1031 data-nosnippet>1031</a>
-<a href=#1032 id=1032 data-nosnippet>1032</a>    <span class="attr">#[test]
-<a href=#1033 id=1033 data-nosnippet>1033</a>    </span><span class="kw">fn </span>test_retry_delay_client_ipv6() -&gt; TestResult {
-<a href=#1034 id=1034 data-nosnippet>1034</a>        <span class="kw">let </span>initial_rtt = Duration::from_millis(<span class="number">333</span>);
-<a href=#1035 id=1035 data-nosnippet>1035</a>        <span class="kw">let </span>ipv6 = <span class="bool-val">true</span>;
-<a href=#1036 id=1036 data-nosnippet>1036</a>        <span class="kw">let </span>remote = SocketAddr::from((<span class="string">"::2"</span>.parse::&lt;IpAddr&gt;()<span class="question-mark">?</span>, <span class="number">2</span>));
-<a href=#1037 id=1037 data-nosnippet>1037</a>        <span class="kw">let </span>remote_ipp = (remote.ip(), remote.port());
-<a href=#1038 id=1038 data-nosnippet>1038</a>        <span class="kw">let </span>local_addr = SocketAddr::from((<span class="string">"::3"</span>.parse::&lt;IpAddr&gt;()<span class="question-mark">?</span>, <span class="number">3</span>));
-<a href=#1039 id=1039 data-nosnippet>1039</a>
-<a href=#1040 id=1040 data-nosnippet>1040</a>        <span class="kw">let </span><span class="kw-2">mut </span>nat = State::new(<span class="number">8</span>, <span class="number">8</span>, Side::Client);
-<a href=#1041 id=1041 data-nosnippet>1041</a>        nat.add_local_address(local_addr)<span class="question-mark">?</span>;
-<a href=#1042 id=1042 data-nosnippet>1042</a>        nat.client_side_mut()<span class="question-mark">?</span>.add_remote_address(AddAddress {
-<a href=#1043 id=1043 data-nosnippet>1043</a>            seq_no: <span class="number">1u8</span>.into(),
-<a href=#1044 id=1044 data-nosnippet>1044</a>            ip: remote.ip(),
-<a href=#1045 id=1045 data-nosnippet>1045</a>            port: remote.port(),
-<a href=#1046 id=1046 data-nosnippet>1046</a>        })<span class="question-mark">?</span>;
-<a href=#1047 id=1047 data-nosnippet>1047</a>        nat.client_side_mut()<span class="question-mark">?</span>.initiate_nat_traversal_round(ipv6)<span class="question-mark">?</span>;
-<a href=#1048 id=1048 data-nosnippet>1048</a>
-<a href=#1049 id=1049 data-nosnippet>1049</a>        <span class="kw">let </span>challenges = [<span class="number">1u64</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>, <span class="number">7</span>];
-<a href=#1050 id=1050 data-nosnippet>1050</a>        <span class="kw">let </span>delays = [
-<a href=#1051 id=1051 data-nosnippet>1051</a>            <span class="number">33_300u64</span>, <span class="number">66_600</span>, <span class="number">133_200</span>, <span class="number">266_400</span>, <span class="number">532_800</span>, <span class="number">1_065_600</span>, <span class="number">2_000_000</span>,
-<a href=#1052 id=1052 data-nosnippet>1052</a>        ];
-<a href=#1053 id=1053 data-nosnippet>1053</a>        <span class="kw">for </span>(challenge, delay) <span class="kw">in </span>challenges.into_iter().zip(delays) {
-<a href=#1054 id=1054 data-nosnippet>1054</a>            nat.queue_retries(ipv6);
-<a href=#1055 id=1055 data-nosnippet>1055</a>            <span class="macro">assert_eq!</span>(nat.next_probe_addr(), <span class="prelude-val">Some</span>(remote_ipp));
-<a href=#1056 id=1056 data-nosnippet>1056</a>            nat.mark_probe_sent(remote_ipp, challenge);
-<a href=#1057 id=1057 data-nosnippet>1057</a>            <span class="macro">assert_eq!</span>(
-<a href=#1058 id=1058 data-nosnippet>1058</a>                nat.retry_delay(initial_rtt),
-<a href=#1059 id=1059 data-nosnippet>1059</a>                <span class="prelude-val">Some</span>(Duration::from_micros(delay)),
-<a href=#1060 id=1060 data-nosnippet>1060</a>                <span class="string">"challenge: {challenge}"
-<a href=#1061 id=1061 data-nosnippet>1061</a>            </span>);
-<a href=#1062 id=1062 data-nosnippet>1062</a>        }
-<a href=#1063 id=1063 data-nosnippet>1063</a>
-<a href=#1064 id=1064 data-nosnippet>1064</a>        <span class="macro">assert!</span>(nat.handle_path_response(
-<a href=#1065 id=1065 data-nosnippet>1065</a>            FourTuple {
-<a href=#1066 id=1066 data-nosnippet>1066</a>                remote,
-<a href=#1067 id=1067 data-nosnippet>1067</a>                local_ip: <span class="prelude-val">Some</span>(local_addr.ip()),
-<a href=#1068 id=1068 data-nosnippet>1068</a>            },
-<a href=#1069 id=1069 data-nosnippet>1069</a>            challenges[<span class="number">6</span>]
-<a href=#1070 id=1070 data-nosnippet>1070</a>        ));
-<a href=#1071 id=1071 data-nosnippet>1071</a>        <span class="macro">assert_eq!</span>(nat.retry_delay(initial_rtt), <span class="prelude-val">None</span>);
-<a href=#1072 id=1072 data-nosnippet>1072</a>
-<a href=#1073 id=1073 data-nosnippet>1073</a>        <span class="prelude-val">Ok</span>(())
-<a href=#1074 id=1074 data-nosnippet>1074</a>    }
-<a href=#1075 id=1075 data-nosnippet>1075</a>}</code></pre></div></section></main></body></html>
+<a href=#996 id=996 data-nosnippet>996</a>        <span class="kw">let </span><span class="kw-2">mut </span>nat = State::new(<span class="number">8</span>, <span class="number">8</span>, Side::Server);
+<a href=#997 id=997 data-nosnippet>997</a>
+<a href=#998 id=998 data-nosnippet>998</a>        nat.server_side_mut()<span class="question-mark">?</span>.handle_reach_out(
+<a href=#999 id=999 data-nosnippet>999</a>            ReachOut {
+<a href=#1000 id=1000 data-nosnippet>1000</a>                round: <span class="number">1u8</span>.into(),
+<a href=#1001 id=1001 data-nosnippet>1001</a>                ip: remote.ip(),
+<a href=#1002 id=1002 data-nosnippet>1002</a>                port: remote.port(),
+<a href=#1003 id=1003 data-nosnippet>1003</a>            },
+<a href=#1004 id=1004 data-nosnippet>1004</a>            ipv6,
+<a href=#1005 id=1005 data-nosnippet>1005</a>        )<span class="question-mark">?</span>;
+<a href=#1006 id=1006 data-nosnippet>1006</a>
+<a href=#1007 id=1007 data-nosnippet>1007</a>        <span class="kw">let </span>challenges = [<span class="number">1u64</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>, <span class="number">7</span>];
+<a href=#1008 id=1008 data-nosnippet>1008</a>        <span class="kw">let </span>delays = [
+<a href=#1009 id=1009 data-nosnippet>1009</a>            <span class="number">33_300u64</span>, <span class="number">66_600</span>, <span class="number">133_200</span>, <span class="number">266_400</span>, <span class="number">532_800</span>, <span class="number">1_065_600</span>, <span class="number">2_000_000</span>,
+<a href=#1010 id=1010 data-nosnippet>1010</a>        ];
+<a href=#1011 id=1011 data-nosnippet>1011</a>        <span class="kw">for </span>(challenge, delay) <span class="kw">in </span>challenges.into_iter().zip(delays) {
+<a href=#1012 id=1012 data-nosnippet>1012</a>            nat.queue_retries(ipv6);
+<a href=#1013 id=1013 data-nosnippet>1013</a>            <span class="macro">assert_eq!</span>(nat.next_probe_addr(), <span class="prelude-val">Some</span>(remote_ipp));
+<a href=#1014 id=1014 data-nosnippet>1014</a>            nat.mark_probe_sent(remote_ipp, challenge);
+<a href=#1015 id=1015 data-nosnippet>1015</a>            <span class="macro">assert_eq!</span>(
+<a href=#1016 id=1016 data-nosnippet>1016</a>                nat.retry_delay(initial_rtt),
+<a href=#1017 id=1017 data-nosnippet>1017</a>                <span class="prelude-val">Some</span>(Duration::from_micros(delay)),
+<a href=#1018 id=1018 data-nosnippet>1018</a>                <span class="string">"challenge: {challenge}"
+<a href=#1019 id=1019 data-nosnippet>1019</a>            </span>);
+<a href=#1020 id=1020 data-nosnippet>1020</a>        }
+<a href=#1021 id=1021 data-nosnippet>1021</a>
+<a href=#1022 id=1022 data-nosnippet>1022</a>        <span class="macro">assert!</span>(nat.handle_path_response(
+<a href=#1023 id=1023 data-nosnippet>1023</a>            FourTuple {
+<a href=#1024 id=1024 data-nosnippet>1024</a>                remote,
+<a href=#1025 id=1025 data-nosnippet>1025</a>                local_ip: <span class="prelude-val">Some</span>(<span class="string">"::3"</span>.parse::&lt;IpAddr&gt;()<span class="question-mark">?</span>),
+<a href=#1026 id=1026 data-nosnippet>1026</a>            },
+<a href=#1027 id=1027 data-nosnippet>1027</a>            challenges[<span class="number">6</span>]
+<a href=#1028 id=1028 data-nosnippet>1028</a>        ));
+<a href=#1029 id=1029 data-nosnippet>1029</a>        <span class="macro">assert_eq!</span>(nat.retry_delay(initial_rtt), <span class="prelude-val">None</span>);
+<a href=#1030 id=1030 data-nosnippet>1030</a>
+<a href=#1031 id=1031 data-nosnippet>1031</a>        <span class="prelude-val">Ok</span>(())
+<a href=#1032 id=1032 data-nosnippet>1032</a>    }
+<a href=#1033 id=1033 data-nosnippet>1033</a>
+<a href=#1034 id=1034 data-nosnippet>1034</a>    <span class="attr">#[test]
+<a href=#1035 id=1035 data-nosnippet>1035</a>    </span><span class="kw">fn </span>test_retry_delay_client_ipv6() -&gt; TestResult {
+<a href=#1036 id=1036 data-nosnippet>1036</a>        <span class="kw">let </span>initial_rtt = Duration::from_millis(<span class="number">333</span>);
+<a href=#1037 id=1037 data-nosnippet>1037</a>        <span class="kw">let </span>ipv6 = <span class="bool-val">true</span>;
+<a href=#1038 id=1038 data-nosnippet>1038</a>        <span class="kw">let </span>remote = SocketAddr::from((<span class="string">"::2"</span>.parse::&lt;IpAddr&gt;()<span class="question-mark">?</span>, <span class="number">2</span>));
+<a href=#1039 id=1039 data-nosnippet>1039</a>        <span class="kw">let </span>remote_ipp = (remote.ip(), remote.port());
+<a href=#1040 id=1040 data-nosnippet>1040</a>        <span class="kw">let </span>local_addr = SocketAddr::from((<span class="string">"::3"</span>.parse::&lt;IpAddr&gt;()<span class="question-mark">?</span>, <span class="number">3</span>));
+<a href=#1041 id=1041 data-nosnippet>1041</a>
+<a href=#1042 id=1042 data-nosnippet>1042</a>        <span class="kw">let </span><span class="kw-2">mut </span>nat = State::new(<span class="number">8</span>, <span class="number">8</span>, Side::Client);
+<a href=#1043 id=1043 data-nosnippet>1043</a>        nat.add_local_address(local_addr)<span class="question-mark">?</span>;
+<a href=#1044 id=1044 data-nosnippet>1044</a>        nat.client_side_mut()<span class="question-mark">?</span>.add_remote_address(AddAddress {
+<a href=#1045 id=1045 data-nosnippet>1045</a>            seq_no: <span class="number">1u8</span>.into(),
+<a href=#1046 id=1046 data-nosnippet>1046</a>            ip: remote.ip(),
+<a href=#1047 id=1047 data-nosnippet>1047</a>            port: remote.port(),
+<a href=#1048 id=1048 data-nosnippet>1048</a>        })<span class="question-mark">?</span>;
+<a href=#1049 id=1049 data-nosnippet>1049</a>        nat.client_side_mut()<span class="question-mark">?</span>.initiate_nat_traversal_round(ipv6)<span class="question-mark">?</span>;
+<a href=#1050 id=1050 data-nosnippet>1050</a>
+<a href=#1051 id=1051 data-nosnippet>1051</a>        <span class="kw">let </span>challenges = [<span class="number">1u64</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span>, <span class="number">6</span>, <span class="number">7</span>];
+<a href=#1052 id=1052 data-nosnippet>1052</a>        <span class="kw">let </span>delays = [
+<a href=#1053 id=1053 data-nosnippet>1053</a>            <span class="number">33_300u64</span>, <span class="number">66_600</span>, <span class="number">133_200</span>, <span class="number">266_400</span>, <span class="number">532_800</span>, <span class="number">1_065_600</span>, <span class="number">2_000_000</span>,
+<a href=#1054 id=1054 data-nosnippet>1054</a>        ];
+<a href=#1055 id=1055 data-nosnippet>1055</a>        <span class="kw">for </span>(challenge, delay) <span class="kw">in </span>challenges.into_iter().zip(delays) {
+<a href=#1056 id=1056 data-nosnippet>1056</a>            nat.queue_retries(ipv6);
+<a href=#1057 id=1057 data-nosnippet>1057</a>            <span class="macro">assert_eq!</span>(nat.next_probe_addr(), <span class="prelude-val">Some</span>(remote_ipp));
+<a href=#1058 id=1058 data-nosnippet>1058</a>            nat.mark_probe_sent(remote_ipp, challenge);
+<a href=#1059 id=1059 data-nosnippet>1059</a>            <span class="macro">assert_eq!</span>(
+<a href=#1060 id=1060 data-nosnippet>1060</a>                nat.retry_delay(initial_rtt),
+<a href=#1061 id=1061 data-nosnippet>1061</a>                <span class="prelude-val">Some</span>(Duration::from_micros(delay)),
+<a href=#1062 id=1062 data-nosnippet>1062</a>                <span class="string">"challenge: {challenge}"
+<a href=#1063 id=1063 data-nosnippet>1063</a>            </span>);
+<a href=#1064 id=1064 data-nosnippet>1064</a>        }
+<a href=#1065 id=1065 data-nosnippet>1065</a>
+<a href=#1066 id=1066 data-nosnippet>1066</a>        <span class="macro">assert!</span>(nat.handle_path_response(
+<a href=#1067 id=1067 data-nosnippet>1067</a>            FourTuple {
+<a href=#1068 id=1068 data-nosnippet>1068</a>                remote,
+<a href=#1069 id=1069 data-nosnippet>1069</a>                local_ip: <span class="prelude-val">Some</span>(local_addr.ip()),
+<a href=#1070 id=1070 data-nosnippet>1070</a>            },
+<a href=#1071 id=1071 data-nosnippet>1071</a>            challenges[<span class="number">6</span>]
+<a href=#1072 id=1072 data-nosnippet>1072</a>        ));
+<a href=#1073 id=1073 data-nosnippet>1073</a>        <span class="macro">assert_eq!</span>(nat.retry_delay(initial_rtt), <span class="prelude-val">None</span>);
+<a href=#1074 id=1074 data-nosnippet>1074</a>
+<a href=#1075 id=1075 data-nosnippet>1075</a>        <span class="prelude-val">Ok</span>(())
+<a href=#1076 id=1076 data-nosnippet>1076</a>    }
+<a href=#1077 id=1077 data-nosnippet>1077</a>}</code></pre></div></section></main></body></html>
