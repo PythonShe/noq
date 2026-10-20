@@ -391,10 +391,10 @@
 <a href=#391 id=391 data-nosnippet>391</a>    }
 <a href=#392 id=392 data-nosnippet>392</a>
 <a href=#393 id=393 data-nosnippet>393</a>    <span class="doccomment">/// Whether any stream data is queued for this path, regardless of control frames.
-<a href=#394 id=394 data-nosnippet>394</a>    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>can_send_stream_data(<span class="kw-2">&amp;</span><span class="self">self</span>, path: PathId, status_allows_data: bool) -&gt; bool {
+<a href=#394 id=394 data-nosnippet>394</a>    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>can_send_stream_data(<span class="kw-2">&amp;</span><span class="self">self</span>, path: PathId, include_affinity_any: bool) -&gt; bool {
 <a href=#395 id=395 data-nosnippet>395</a>        <span class="comment">// Empty writes and late ACKs can leave entries without pending work; loss recovery
 <a href=#396 id=396 data-nosnippet>396</a>        // can requeue reset streams.
-<a href=#397 id=397 data-nosnippet>397</a>        </span><span class="self">self</span>.pending.iter(path, status_allows_data).any(|stream| {
+<a href=#397 id=397 data-nosnippet>397</a>        </span><span class="self">self</span>.pending.iter(path, include_affinity_any).any(|stream| {
 <a href=#398 id=398 data-nosnippet>398</a>            <span class="self">self</span>.send
 <a href=#399 id=399 data-nosnippet>399</a>                .get(<span class="kw-2">&amp;</span>stream.id)
 <a href=#400 id=400 data-nosnippet>400</a>                .and_then(|s| s.as_ref())
