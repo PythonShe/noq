@@ -274,6 +274,16 @@ pub(super) struct PacketNumberSpace {
     pub(super) pending_ping: bool,
     /// Packet numbers to acknowledge.
     pub(super) pending_acks: PendingAcks,
+    /// The earliest time at which we are willing to opportunistically bundle a pending ACK for
+    /// this path into a packet that is otherwise being sent (e.g. one carrying STREAM or
+    /// DATAGRAM frames), rather than waiting to send it in a dedicated ACK packet.
+    ///
+    /// The goal is to wait long enough for the peer to acknowledge our previous bundled ACK, so
+    /// we don't waste the peer's resources processing redundant bundled ACKs. A packet-count
+    /// threshold would over- or under-shoot this depending on how fast we happen to be sending,
+    /// so a time threshold is used instead. See
+    /// [`Connection::next_bundled_ack_delay`](super::Connection::next_bundled_ack_delay).
+    pub(super) next_bundled_ack_time: Option<Instant>,
     /// An IMMEDIATE_ACK (draft-ietf-quic-ack-frequency) frame needs to be sent on this path.
     pub(super) pending_immediate_ack: bool,
     /// Responses to path challenges that need to be sent, on and off-path.
@@ -322,6 +332,7 @@ impl PacketNumberSpace {
             ecn_feedback: frame::EcnCounts::ZERO,
             pending_ping: false,
             pending_acks: PendingAcks::new(),
+            next_bundled_ack_time: None,
             pending_immediate_ack: false,
             pending_path_responses: PathResponses::default(),
             dedup: Default::default(),
@@ -352,6 +363,7 @@ impl PacketNumberSpace {
             ecn_feedback: frame::EcnCounts::ZERO,
             pending_ping: false,
             pending_acks: PendingAcks::new(),
+            next_bundled_ack_time: None,
             pending_immediate_ack: false,
             pending_path_responses: PathResponses::default(),
             dedup: Default::default(),
@@ -1192,6 +1204,15 @@ impl PendingAcks {
     /// [`Connection::space_can_send`]: super::Connection::space_can_send
     pub(super) fn can_send(&self) -> bool {
         self.immediate_ack_required && !self.ranges.is_empty()
+    }
+
+    /// Whether an ACK frame could be opportunistically bundled with other frames.
+    ///
+    /// Unlike [`Self::can_send`], this does not require `immediate_ack_required` to be set:
+    /// bundling a pending ACK into a packet that is being sent anyway is essentially free, as
+    /// opposed to sending a dedicated ACK-only packet for it.
+    pub(super) fn can_send_with_other_frames(&self) -> bool {
+        !self.ranges.is_empty()
     }
 
     /// Returns the delay since the packet with the largest packet number was received
