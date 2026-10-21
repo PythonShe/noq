@@ -6,7 +6,7 @@
 <a href=#6 id=6 data-nosnippet>6</a>//! contained in this modules should generally only be referred to by custom
 <a href=#7 id=7 data-nosnippet>7</a>//! implementations of the `crypto::Session` trait.
 <a href=#8 id=8 data-nosnippet>8</a>
-<a href=#9 id=9 data-nosnippet>9</a></span><span class="kw">use </span>std::{
+<a href=#9 id=9 data-nosnippet>9</a></span><span class="kw">use </span>core::{
 <a href=#10 id=10 data-nosnippet>10</a>    convert::TryFrom,
 <a href=#11 id=11 data-nosnippet>11</a>    net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6},
 <a href=#12 id=12 data-nosnippet>12</a>    num::NonZeroU8,
@@ -191,7 +191,7 @@
 <a href=#191 id=191 data-nosnippet>191</a>            ),
 <a href=#192 id=192 data-nosnippet>192</a>            grease_transport_parameter: <span class="prelude-val">Some</span>(ReservedTransportParameter::random(rng)),
 <a href=#193 id=193 data-nosnippet>193</a>            write_order: <span class="prelude-val">Some</span>({
-<a href=#194 id=194 data-nosnippet>194</a>                <span class="kw">let </span><span class="kw-2">mut </span>order = std::array::from_fn(|i| i <span class="kw">as </span>u8);
+<a href=#194 id=194 data-nosnippet>194</a>                <span class="kw">let </span><span class="kw-2">mut </span>order = core::array::from_fn(|i| i <span class="kw">as </span>u8);
 <a href=#195 id=195 data-nosnippet>195</a>                order.shuffle(rng);
 <a href=#196 id=196 data-nosnippet>196</a>                order
 <a href=#197 id=197 data-nosnippet>197</a>            }),
@@ -329,7 +329,7 @@
 <a href=#329 id=329 data-nosnippet>329</a>    </span><span class="kw">pub fn </span>write&lt;W: BufMut&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, w: <span class="kw-2">&amp;mut </span>W) {
 <a href=#330 id=330 data-nosnippet>330</a>        <span class="kw">let </span>ids = <span class="kw">match </span><span class="kw-2">&amp;</span><span class="self">self</span>.write_order {
 <a href=#331 id=331 data-nosnippet>331</a>            <span class="prelude-val">Some</span>(order) =&gt; order,
-<a href=#332 id=332 data-nosnippet>332</a>            <span class="prelude-val">None </span>=&gt; <span class="kw-2">&amp;</span>std::array::from_fn(|i| i <span class="kw">as </span>u8),
+<a href=#332 id=332 data-nosnippet>332</a>            <span class="prelude-val">None </span>=&gt; <span class="kw-2">&amp;</span>core::array::from_fn(|i| i <span class="kw">as </span>u8),
 <a href=#333 id=333 data-nosnippet>333</a>        };
 <a href=#334 id=334 data-nosnippet>334</a>
 <a href=#335 id=335 data-nosnippet>335</a>        <span class="kw">for </span>idx <span class="kw">in </span>ids {
@@ -820,162 +820,163 @@
 <a href=#820 id=820 data-nosnippet>820</a>
 <a href=#821 id=821 data-nosnippet>821</a><span class="attr">#[cfg(test)]
 <a href=#822 id=822 data-nosnippet>822</a></span><span class="kw">mod </span>test {
-<a href=#823 id=823 data-nosnippet>823</a>
-<a href=#824 id=824 data-nosnippet>824</a>    <span class="kw">use super</span>::<span class="kw-2">*</span>;
-<a href=#825 id=825 data-nosnippet>825</a>
-<a href=#826 id=826 data-nosnippet>826</a>    <span class="attr">#[test]
-<a href=#827 id=827 data-nosnippet>827</a>    </span><span class="kw">fn </span>coding() {
-<a href=#828 id=828 data-nosnippet>828</a>        <span class="kw">let </span><span class="kw-2">mut </span>buf = Vec::new();
-<a href=#829 id=829 data-nosnippet>829</a>        <span class="kw">let </span>params = TransportParameters {
-<a href=#830 id=830 data-nosnippet>830</a>            initial_src_cid: <span class="prelude-val">Some</span>(ConnectionId::new(<span class="kw-2">&amp;</span>[])),
-<a href=#831 id=831 data-nosnippet>831</a>            original_dst_cid: <span class="prelude-val">Some</span>(ConnectionId::new(<span class="kw-2">&amp;</span>[])),
-<a href=#832 id=832 data-nosnippet>832</a>            initial_max_streams_bidi: <span class="number">16u32</span>.into(),
-<a href=#833 id=833 data-nosnippet>833</a>            initial_max_streams_uni: <span class="number">16u32</span>.into(),
-<a href=#834 id=834 data-nosnippet>834</a>            ack_delay_exponent: <span class="number">2u32</span>.into(),
-<a href=#835 id=835 data-nosnippet>835</a>            max_udp_payload_size: <span class="number">1200u32</span>.into(),
-<a href=#836 id=836 data-nosnippet>836</a>            preferred_address: <span class="prelude-val">Some</span>(PreferredAddress {
-<a href=#837 id=837 data-nosnippet>837</a>                address_v4: <span class="prelude-val">Some</span>(SocketAddrV4::new(Ipv4Addr::LOCALHOST, <span class="number">42</span>)),
-<a href=#838 id=838 data-nosnippet>838</a>                address_v6: <span class="prelude-val">Some</span>(SocketAddrV6::new(Ipv6Addr::LOCALHOST, <span class="number">24</span>, <span class="number">0</span>, <span class="number">0</span>)),
-<a href=#839 id=839 data-nosnippet>839</a>                connection_id: ConnectionId::new(<span class="kw-2">&amp;</span>[<span class="number">0x42</span>]),
-<a href=#840 id=840 data-nosnippet>840</a>                stateless_reset_token: [<span class="number">0xab</span>; RESET_TOKEN_SIZE].into(),
-<a href=#841 id=841 data-nosnippet>841</a>            }),
-<a href=#842 id=842 data-nosnippet>842</a>            grease_quic_bit: <span class="bool-val">true</span>,
-<a href=#843 id=843 data-nosnippet>843</a>            min_ack_delay: <span class="prelude-val">Some</span>(<span class="number">2_000u32</span>.into()),
-<a href=#844 id=844 data-nosnippet>844</a>            address_discovery_role: address_discovery::Role::send_only(),
-<a href=#845 id=845 data-nosnippet>845</a>            initial_max_path_id: <span class="prelude-val">Some</span>(PathId::MAX),
-<a href=#846 id=846 data-nosnippet>846</a>            max_remote_nat_traversal_addresses: <span class="prelude-val">Some</span>(<span class="number">5u8</span>.try_into().unwrap()),
-<a href=#847 id=847 data-nosnippet>847</a>            ..TransportParameters::default()
-<a href=#848 id=848 data-nosnippet>848</a>        };
-<a href=#849 id=849 data-nosnippet>849</a>        params.write(<span class="kw-2">&amp;mut </span>buf);
-<a href=#850 id=850 data-nosnippet>850</a>        <span class="macro">assert_eq!</span>(
-<a href=#851 id=851 data-nosnippet>851</a>            TransportParameters::read(Side::Client, <span class="kw-2">&amp;mut </span>buf.as_slice()).unwrap(),
-<a href=#852 id=852 data-nosnippet>852</a>            params
-<a href=#853 id=853 data-nosnippet>853</a>        );
-<a href=#854 id=854 data-nosnippet>854</a>    }
-<a href=#855 id=855 data-nosnippet>855</a>
-<a href=#856 id=856 data-nosnippet>856</a>    <span class="attr">#[test]
-<a href=#857 id=857 data-nosnippet>857</a>    </span><span class="kw">fn </span>reserved_transport_parameter_generate_reserved_id() {
-<a href=#858 id=858 data-nosnippet>858</a>        <span class="kw">let </span><span class="kw-2">mut </span>rngs = [
-<a href=#859 id=859 data-nosnippet>859</a>            StepRng(<span class="number">0</span>),
-<a href=#860 id=860 data-nosnippet>860</a>            StepRng(<span class="number">1</span>),
-<a href=#861 id=861 data-nosnippet>861</a>            StepRng(<span class="number">27</span>),
-<a href=#862 id=862 data-nosnippet>862</a>            StepRng(<span class="number">31</span>),
-<a href=#863 id=863 data-nosnippet>863</a>            StepRng(u32::MAX <span class="kw">as </span>u64),
-<a href=#864 id=864 data-nosnippet>864</a>            StepRng(u32::MAX <span class="kw">as </span>u64 - <span class="number">1</span>),
-<a href=#865 id=865 data-nosnippet>865</a>            StepRng(u32::MAX <span class="kw">as </span>u64 + <span class="number">1</span>),
-<a href=#866 id=866 data-nosnippet>866</a>            StepRng(u32::MAX <span class="kw">as </span>u64 - <span class="number">27</span>),
-<a href=#867 id=867 data-nosnippet>867</a>            StepRng(u32::MAX <span class="kw">as </span>u64 + <span class="number">27</span>),
-<a href=#868 id=868 data-nosnippet>868</a>            StepRng(u32::MAX <span class="kw">as </span>u64 - <span class="number">31</span>),
-<a href=#869 id=869 data-nosnippet>869</a>            StepRng(u32::MAX <span class="kw">as </span>u64 + <span class="number">31</span>),
-<a href=#870 id=870 data-nosnippet>870</a>            StepRng(u64::MAX),
-<a href=#871 id=871 data-nosnippet>871</a>            StepRng(u64::MAX - <span class="number">1</span>),
-<a href=#872 id=872 data-nosnippet>872</a>            StepRng(u64::MAX - <span class="number">27</span>),
-<a href=#873 id=873 data-nosnippet>873</a>            StepRng(u64::MAX - <span class="number">31</span>),
-<a href=#874 id=874 data-nosnippet>874</a>            StepRng(<span class="number">1 </span>&lt;&lt; <span class="number">62</span>),
-<a href=#875 id=875 data-nosnippet>875</a>            StepRng((<span class="number">1 </span>&lt;&lt; <span class="number">62</span>) - <span class="number">1</span>),
-<a href=#876 id=876 data-nosnippet>876</a>            StepRng((<span class="number">1 </span>&lt;&lt; <span class="number">62</span>) + <span class="number">1</span>),
-<a href=#877 id=877 data-nosnippet>877</a>            StepRng((<span class="number">1 </span>&lt;&lt; <span class="number">62</span>) - <span class="number">27</span>),
-<a href=#878 id=878 data-nosnippet>878</a>            StepRng((<span class="number">1 </span>&lt;&lt; <span class="number">62</span>) + <span class="number">27</span>),
-<a href=#879 id=879 data-nosnippet>879</a>            StepRng((<span class="number">1 </span>&lt;&lt; <span class="number">62</span>) - <span class="number">31</span>),
-<a href=#880 id=880 data-nosnippet>880</a>            StepRng((<span class="number">1 </span>&lt;&lt; <span class="number">62</span>) + <span class="number">31</span>),
-<a href=#881 id=881 data-nosnippet>881</a>        ];
-<a href=#882 id=882 data-nosnippet>882</a>        <span class="kw">for </span>rng <span class="kw">in </span><span class="kw-2">&amp;mut </span>rngs {
-<a href=#883 id=883 data-nosnippet>883</a>            <span class="kw">let </span>id = ReservedTransportParameter::generate_reserved_id(rng);
-<a href=#884 id=884 data-nosnippet>884</a>            <span class="macro">assert!</span>(id.<span class="number">0 </span>% <span class="number">31 </span>== <span class="number">27</span>)
-<a href=#885 id=885 data-nosnippet>885</a>        }
-<a href=#886 id=886 data-nosnippet>886</a>    }
-<a href=#887 id=887 data-nosnippet>887</a>
-<a href=#888 id=888 data-nosnippet>888</a>    <span class="kw">struct </span>StepRng(u64);
-<a href=#889 id=889 data-nosnippet>889</a>
-<a href=#890 id=890 data-nosnippet>890</a>    <span class="kw">impl </span>rand::TryRng <span class="kw">for </span>StepRng {
-<a href=#891 id=891 data-nosnippet>891</a>        <span class="kw">type </span>Error = std::convert::Infallible;
-<a href=#892 id=892 data-nosnippet>892</a>
-<a href=#893 id=893 data-nosnippet>893</a>        <span class="attr">#[inline]
-<a href=#894 id=894 data-nosnippet>894</a>        </span><span class="kw">fn </span>try_next_u32(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;u32, <span class="self">Self</span>::Error&gt; {
-<a href=#895 id=895 data-nosnippet>895</a>            <span class="prelude-val">Ok</span>(<span class="self">self</span>.next_u64() <span class="kw">as </span>u32)
-<a href=#896 id=896 data-nosnippet>896</a>        }
-<a href=#897 id=897 data-nosnippet>897</a>
-<a href=#898 id=898 data-nosnippet>898</a>        <span class="attr">#[inline]
-<a href=#899 id=899 data-nosnippet>899</a>        </span><span class="kw">fn </span>try_next_u64(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;u64, <span class="self">Self</span>::Error&gt; {
-<a href=#900 id=900 data-nosnippet>900</a>            <span class="kw">let </span>res = <span class="self">self</span>.<span class="number">0</span>;
-<a href=#901 id=901 data-nosnippet>901</a>            <span class="self">self</span>.<span class="number">0 </span>= <span class="self">self</span>.<span class="number">0</span>.wrapping_add(<span class="number">1</span>);
-<a href=#902 id=902 data-nosnippet>902</a>            <span class="prelude-val">Ok</span>(res)
-<a href=#903 id=903 data-nosnippet>903</a>        }
-<a href=#904 id=904 data-nosnippet>904</a>
-<a href=#905 id=905 data-nosnippet>905</a>        <span class="attr">#[inline]
-<a href=#906 id=906 data-nosnippet>906</a>        </span><span class="kw">fn </span>try_fill_bytes(<span class="kw-2">&amp;mut </span><span class="self">self</span>, dst: <span class="kw-2">&amp;mut </span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="self">Self</span>::Error&gt; {
-<a href=#907 id=907 data-nosnippet>907</a>            <span class="kw">let </span><span class="kw-2">mut </span>left = dst;
-<a href=#908 id=908 data-nosnippet>908</a>            <span class="kw">while </span>left.len() &gt;= <span class="number">8 </span>{
-<a href=#909 id=909 data-nosnippet>909</a>                <span class="kw">let </span>(l, r) = left.split_at_mut(<span class="number">8</span>);
-<a href=#910 id=910 data-nosnippet>910</a>                left = r;
-<a href=#911 id=911 data-nosnippet>911</a>                l.copy_from_slice(<span class="kw-2">&amp;</span><span class="self">self</span>.next_u64().to_le_bytes());
-<a href=#912 id=912 data-nosnippet>912</a>            }
-<a href=#913 id=913 data-nosnippet>913</a>            <span class="kw">let </span>n = left.len();
-<a href=#914 id=914 data-nosnippet>914</a>            <span class="kw">if </span>n &gt; <span class="number">0 </span>{
-<a href=#915 id=915 data-nosnippet>915</a>                left.copy_from_slice(<span class="kw-2">&amp;</span><span class="self">self</span>.next_u32().to_le_bytes()[..n]);
-<a href=#916 id=916 data-nosnippet>916</a>            }
-<a href=#917 id=917 data-nosnippet>917</a>            <span class="prelude-val">Ok</span>(())
-<a href=#918 id=918 data-nosnippet>918</a>        }
-<a href=#919 id=919 data-nosnippet>919</a>    }
-<a href=#920 id=920 data-nosnippet>920</a>
-<a href=#921 id=921 data-nosnippet>921</a>    <span class="attr">#[test]
-<a href=#922 id=922 data-nosnippet>922</a>    </span><span class="kw">fn </span>reserved_transport_parameter_ignored_when_read() {
-<a href=#923 id=923 data-nosnippet>923</a>        <span class="kw">let </span><span class="kw-2">mut </span>buf = Vec::new();
-<a href=#924 id=924 data-nosnippet>924</a>        <span class="kw">let </span>reserved_parameter = ReservedTransportParameter::random(<span class="kw-2">&amp;mut </span>rand::rng());
-<a href=#925 id=925 data-nosnippet>925</a>        <span class="macro">assert!</span>(reserved_parameter.payload_len &lt; ReservedTransportParameter::MAX_PAYLOAD_LEN);
-<a href=#926 id=926 data-nosnippet>926</a>        <span class="macro">assert!</span>(reserved_parameter.id.<span class="number">0 </span>% <span class="number">31 </span>== <span class="number">27</span>);
-<a href=#927 id=927 data-nosnippet>927</a>
-<a href=#928 id=928 data-nosnippet>928</a>        reserved_parameter.write(<span class="kw-2">&amp;mut </span>buf);
-<a href=#929 id=929 data-nosnippet>929</a>        <span class="macro">assert!</span>(!buf.is_empty());
-<a href=#930 id=930 data-nosnippet>930</a>        <span class="kw">let </span>read_params = TransportParameters::read(Side::Server, <span class="kw-2">&amp;mut </span>buf.as_slice()).unwrap();
-<a href=#931 id=931 data-nosnippet>931</a>        <span class="macro">assert_eq!</span>(read_params, TransportParameters::default());
-<a href=#932 id=932 data-nosnippet>932</a>    }
-<a href=#933 id=933 data-nosnippet>933</a>
-<a href=#934 id=934 data-nosnippet>934</a>    <span class="attr">#[test]
-<a href=#935 id=935 data-nosnippet>935</a>    </span><span class="kw">fn </span>read_semantic_validation() {
-<a href=#936 id=936 data-nosnippet>936</a>        <span class="attr">#[allow(clippy::type_complexity)]
-<a href=#937 id=937 data-nosnippet>937</a>        </span><span class="kw">let </span>illegal_params_builders: Vec&lt;Box&lt;<span class="kw">dyn </span>FnMut(<span class="kw-2">&amp;mut </span>TransportParameters)&gt;&gt; = <span class="macro">vec!</span>[
-<a href=#938 id=938 data-nosnippet>938</a>            Box::new(|t| {
-<a href=#939 id=939 data-nosnippet>939</a>                <span class="comment">// This min_ack_delay is bigger than max_ack_delay!
-<a href=#940 id=940 data-nosnippet>940</a>                </span><span class="kw">let </span>min_ack_delay = t.max_ack_delay.<span class="number">0 </span>* <span class="number">1_000 </span>+ <span class="number">1</span>;
-<a href=#941 id=941 data-nosnippet>941</a>                t.min_ack_delay = <span class="prelude-val">Some</span>(VarInt::from_u64(min_ack_delay).unwrap())
-<a href=#942 id=942 data-nosnippet>942</a>            }),
-<a href=#943 id=943 data-nosnippet>943</a>            Box::new(|t| {
-<a href=#944 id=944 data-nosnippet>944</a>                <span class="comment">// Preferred address can only be sent by senders (and we are reading the transport
-<a href=#945 id=945 data-nosnippet>945</a>                // params as a client)
-<a href=#946 id=946 data-nosnippet>946</a>                </span>t.preferred_address = <span class="prelude-val">Some</span>(PreferredAddress {
-<a href=#947 id=947 data-nosnippet>947</a>                    address_v4: <span class="prelude-val">Some</span>(SocketAddrV4::new(Ipv4Addr::LOCALHOST, <span class="number">42</span>)),
-<a href=#948 id=948 data-nosnippet>948</a>                    address_v6: <span class="prelude-val">None</span>,
-<a href=#949 id=949 data-nosnippet>949</a>                    connection_id: ConnectionId::new(<span class="kw-2">&amp;</span>[]),
-<a href=#950 id=950 data-nosnippet>950</a>                    stateless_reset_token: [<span class="number">0xab</span>; RESET_TOKEN_SIZE].into(),
-<a href=#951 id=951 data-nosnippet>951</a>                })
-<a href=#952 id=952 data-nosnippet>952</a>            }),
-<a href=#953 id=953 data-nosnippet>953</a>        ];
-<a href=#954 id=954 data-nosnippet>954</a>
-<a href=#955 id=955 data-nosnippet>955</a>        <span class="kw">for </span><span class="kw-2">mut </span>builder <span class="kw">in </span>illegal_params_builders {
-<a href=#956 id=956 data-nosnippet>956</a>            <span class="kw">let </span><span class="kw-2">mut </span>buf = Vec::new();
-<a href=#957 id=957 data-nosnippet>957</a>            <span class="kw">let </span><span class="kw-2">mut </span>params = TransportParameters::default();
-<a href=#958 id=958 data-nosnippet>958</a>            builder(<span class="kw-2">&amp;mut </span>params);
-<a href=#959 id=959 data-nosnippet>959</a>            params.write(<span class="kw-2">&amp;mut </span>buf);
-<a href=#960 id=960 data-nosnippet>960</a>
-<a href=#961 id=961 data-nosnippet>961</a>            <span class="macro">assert_eq!</span>(
-<a href=#962 id=962 data-nosnippet>962</a>                TransportParameters::read(Side::Server, <span class="kw-2">&amp;mut </span>buf.as_slice()),
-<a href=#963 id=963 data-nosnippet>963</a>                <span class="prelude-val">Err</span>(Error::IllegalValue)
-<a href=#964 id=964 data-nosnippet>964</a>            );
-<a href=#965 id=965 data-nosnippet>965</a>        }
-<a href=#966 id=966 data-nosnippet>966</a>    }
-<a href=#967 id=967 data-nosnippet>967</a>
-<a href=#968 id=968 data-nosnippet>968</a>    <span class="attr">#[test]
-<a href=#969 id=969 data-nosnippet>969</a>    </span><span class="kw">fn </span>resumption_params_validation() {
-<a href=#970 id=970 data-nosnippet>970</a>        <span class="kw">let </span>high_limit = TransportParameters {
-<a href=#971 id=971 data-nosnippet>971</a>            initial_max_streams_uni: <span class="number">32u32</span>.into(),
-<a href=#972 id=972 data-nosnippet>972</a>            ..TransportParameters::default()
-<a href=#973 id=973 data-nosnippet>973</a>        };
-<a href=#974 id=974 data-nosnippet>974</a>        <span class="kw">let </span>low_limit = TransportParameters {
-<a href=#975 id=975 data-nosnippet>975</a>            initial_max_streams_uni: <span class="number">16u32</span>.into(),
-<a href=#976 id=976 data-nosnippet>976</a>            ..TransportParameters::default()
-<a href=#977 id=977 data-nosnippet>977</a>        };
-<a href=#978 id=978 data-nosnippet>978</a>        high_limit.validate_resumption_from(<span class="kw-2">&amp;</span>low_limit).unwrap();
-<a href=#979 id=979 data-nosnippet>979</a>        low_limit.validate_resumption_from(<span class="kw-2">&amp;</span>high_limit).unwrap_err();
-<a href=#980 id=980 data-nosnippet>980</a>    }
-<a href=#981 id=981 data-nosnippet>981</a>}</code></pre></div></section></main></body></html>
+<a href=#823 id=823 data-nosnippet>823</a>    <span class="kw">use </span>alloc::{boxed::Box, vec, vec::Vec};
+<a href=#824 id=824 data-nosnippet>824</a>
+<a href=#825 id=825 data-nosnippet>825</a>    <span class="kw">use super</span>::<span class="kw-2">*</span>;
+<a href=#826 id=826 data-nosnippet>826</a>
+<a href=#827 id=827 data-nosnippet>827</a>    <span class="attr">#[test]
+<a href=#828 id=828 data-nosnippet>828</a>    </span><span class="kw">fn </span>coding() {
+<a href=#829 id=829 data-nosnippet>829</a>        <span class="kw">let </span><span class="kw-2">mut </span>buf = Vec::new();
+<a href=#830 id=830 data-nosnippet>830</a>        <span class="kw">let </span>params = TransportParameters {
+<a href=#831 id=831 data-nosnippet>831</a>            initial_src_cid: <span class="prelude-val">Some</span>(ConnectionId::new(<span class="kw-2">&amp;</span>[])),
+<a href=#832 id=832 data-nosnippet>832</a>            original_dst_cid: <span class="prelude-val">Some</span>(ConnectionId::new(<span class="kw-2">&amp;</span>[])),
+<a href=#833 id=833 data-nosnippet>833</a>            initial_max_streams_bidi: <span class="number">16u32</span>.into(),
+<a href=#834 id=834 data-nosnippet>834</a>            initial_max_streams_uni: <span class="number">16u32</span>.into(),
+<a href=#835 id=835 data-nosnippet>835</a>            ack_delay_exponent: <span class="number">2u32</span>.into(),
+<a href=#836 id=836 data-nosnippet>836</a>            max_udp_payload_size: <span class="number">1200u32</span>.into(),
+<a href=#837 id=837 data-nosnippet>837</a>            preferred_address: <span class="prelude-val">Some</span>(PreferredAddress {
+<a href=#838 id=838 data-nosnippet>838</a>                address_v4: <span class="prelude-val">Some</span>(SocketAddrV4::new(Ipv4Addr::LOCALHOST, <span class="number">42</span>)),
+<a href=#839 id=839 data-nosnippet>839</a>                address_v6: <span class="prelude-val">Some</span>(SocketAddrV6::new(Ipv6Addr::LOCALHOST, <span class="number">24</span>, <span class="number">0</span>, <span class="number">0</span>)),
+<a href=#840 id=840 data-nosnippet>840</a>                connection_id: ConnectionId::new(<span class="kw-2">&amp;</span>[<span class="number">0x42</span>]),
+<a href=#841 id=841 data-nosnippet>841</a>                stateless_reset_token: [<span class="number">0xab</span>; RESET_TOKEN_SIZE].into(),
+<a href=#842 id=842 data-nosnippet>842</a>            }),
+<a href=#843 id=843 data-nosnippet>843</a>            grease_quic_bit: <span class="bool-val">true</span>,
+<a href=#844 id=844 data-nosnippet>844</a>            min_ack_delay: <span class="prelude-val">Some</span>(<span class="number">2_000u32</span>.into()),
+<a href=#845 id=845 data-nosnippet>845</a>            address_discovery_role: address_discovery::Role::send_only(),
+<a href=#846 id=846 data-nosnippet>846</a>            initial_max_path_id: <span class="prelude-val">Some</span>(PathId::MAX),
+<a href=#847 id=847 data-nosnippet>847</a>            max_remote_nat_traversal_addresses: <span class="prelude-val">Some</span>(<span class="number">5u8</span>.try_into().unwrap()),
+<a href=#848 id=848 data-nosnippet>848</a>            ..TransportParameters::default()
+<a href=#849 id=849 data-nosnippet>849</a>        };
+<a href=#850 id=850 data-nosnippet>850</a>        params.write(<span class="kw-2">&amp;mut </span>buf);
+<a href=#851 id=851 data-nosnippet>851</a>        <span class="macro">assert_eq!</span>(
+<a href=#852 id=852 data-nosnippet>852</a>            TransportParameters::read(Side::Client, <span class="kw-2">&amp;mut </span>buf.as_slice()).unwrap(),
+<a href=#853 id=853 data-nosnippet>853</a>            params
+<a href=#854 id=854 data-nosnippet>854</a>        );
+<a href=#855 id=855 data-nosnippet>855</a>    }
+<a href=#856 id=856 data-nosnippet>856</a>
+<a href=#857 id=857 data-nosnippet>857</a>    <span class="attr">#[test]
+<a href=#858 id=858 data-nosnippet>858</a>    </span><span class="kw">fn </span>reserved_transport_parameter_generate_reserved_id() {
+<a href=#859 id=859 data-nosnippet>859</a>        <span class="kw">let </span><span class="kw-2">mut </span>rngs = [
+<a href=#860 id=860 data-nosnippet>860</a>            StepRng(<span class="number">0</span>),
+<a href=#861 id=861 data-nosnippet>861</a>            StepRng(<span class="number">1</span>),
+<a href=#862 id=862 data-nosnippet>862</a>            StepRng(<span class="number">27</span>),
+<a href=#863 id=863 data-nosnippet>863</a>            StepRng(<span class="number">31</span>),
+<a href=#864 id=864 data-nosnippet>864</a>            StepRng(u32::MAX <span class="kw">as </span>u64),
+<a href=#865 id=865 data-nosnippet>865</a>            StepRng(u32::MAX <span class="kw">as </span>u64 - <span class="number">1</span>),
+<a href=#866 id=866 data-nosnippet>866</a>            StepRng(u32::MAX <span class="kw">as </span>u64 + <span class="number">1</span>),
+<a href=#867 id=867 data-nosnippet>867</a>            StepRng(u32::MAX <span class="kw">as </span>u64 - <span class="number">27</span>),
+<a href=#868 id=868 data-nosnippet>868</a>            StepRng(u32::MAX <span class="kw">as </span>u64 + <span class="number">27</span>),
+<a href=#869 id=869 data-nosnippet>869</a>            StepRng(u32::MAX <span class="kw">as </span>u64 - <span class="number">31</span>),
+<a href=#870 id=870 data-nosnippet>870</a>            StepRng(u32::MAX <span class="kw">as </span>u64 + <span class="number">31</span>),
+<a href=#871 id=871 data-nosnippet>871</a>            StepRng(u64::MAX),
+<a href=#872 id=872 data-nosnippet>872</a>            StepRng(u64::MAX - <span class="number">1</span>),
+<a href=#873 id=873 data-nosnippet>873</a>            StepRng(u64::MAX - <span class="number">27</span>),
+<a href=#874 id=874 data-nosnippet>874</a>            StepRng(u64::MAX - <span class="number">31</span>),
+<a href=#875 id=875 data-nosnippet>875</a>            StepRng(<span class="number">1 </span>&lt;&lt; <span class="number">62</span>),
+<a href=#876 id=876 data-nosnippet>876</a>            StepRng((<span class="number">1 </span>&lt;&lt; <span class="number">62</span>) - <span class="number">1</span>),
+<a href=#877 id=877 data-nosnippet>877</a>            StepRng((<span class="number">1 </span>&lt;&lt; <span class="number">62</span>) + <span class="number">1</span>),
+<a href=#878 id=878 data-nosnippet>878</a>            StepRng((<span class="number">1 </span>&lt;&lt; <span class="number">62</span>) - <span class="number">27</span>),
+<a href=#879 id=879 data-nosnippet>879</a>            StepRng((<span class="number">1 </span>&lt;&lt; <span class="number">62</span>) + <span class="number">27</span>),
+<a href=#880 id=880 data-nosnippet>880</a>            StepRng((<span class="number">1 </span>&lt;&lt; <span class="number">62</span>) - <span class="number">31</span>),
+<a href=#881 id=881 data-nosnippet>881</a>            StepRng((<span class="number">1 </span>&lt;&lt; <span class="number">62</span>) + <span class="number">31</span>),
+<a href=#882 id=882 data-nosnippet>882</a>        ];
+<a href=#883 id=883 data-nosnippet>883</a>        <span class="kw">for </span>rng <span class="kw">in </span><span class="kw-2">&amp;mut </span>rngs {
+<a href=#884 id=884 data-nosnippet>884</a>            <span class="kw">let </span>id = ReservedTransportParameter::generate_reserved_id(rng);
+<a href=#885 id=885 data-nosnippet>885</a>            <span class="macro">assert!</span>(id.<span class="number">0 </span>% <span class="number">31 </span>== <span class="number">27</span>)
+<a href=#886 id=886 data-nosnippet>886</a>        }
+<a href=#887 id=887 data-nosnippet>887</a>    }
+<a href=#888 id=888 data-nosnippet>888</a>
+<a href=#889 id=889 data-nosnippet>889</a>    <span class="kw">struct </span>StepRng(u64);
+<a href=#890 id=890 data-nosnippet>890</a>
+<a href=#891 id=891 data-nosnippet>891</a>    <span class="kw">impl </span>rand::TryRng <span class="kw">for </span>StepRng {
+<a href=#892 id=892 data-nosnippet>892</a>        <span class="kw">type </span>Error = core::convert::Infallible;
+<a href=#893 id=893 data-nosnippet>893</a>
+<a href=#894 id=894 data-nosnippet>894</a>        <span class="attr">#[inline]
+<a href=#895 id=895 data-nosnippet>895</a>        </span><span class="kw">fn </span>try_next_u32(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;u32, <span class="self">Self</span>::Error&gt; {
+<a href=#896 id=896 data-nosnippet>896</a>            <span class="prelude-val">Ok</span>(<span class="self">self</span>.next_u64() <span class="kw">as </span>u32)
+<a href=#897 id=897 data-nosnippet>897</a>        }
+<a href=#898 id=898 data-nosnippet>898</a>
+<a href=#899 id=899 data-nosnippet>899</a>        <span class="attr">#[inline]
+<a href=#900 id=900 data-nosnippet>900</a>        </span><span class="kw">fn </span>try_next_u64(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;u64, <span class="self">Self</span>::Error&gt; {
+<a href=#901 id=901 data-nosnippet>901</a>            <span class="kw">let </span>res = <span class="self">self</span>.<span class="number">0</span>;
+<a href=#902 id=902 data-nosnippet>902</a>            <span class="self">self</span>.<span class="number">0 </span>= <span class="self">self</span>.<span class="number">0</span>.wrapping_add(<span class="number">1</span>);
+<a href=#903 id=903 data-nosnippet>903</a>            <span class="prelude-val">Ok</span>(res)
+<a href=#904 id=904 data-nosnippet>904</a>        }
+<a href=#905 id=905 data-nosnippet>905</a>
+<a href=#906 id=906 data-nosnippet>906</a>        <span class="attr">#[inline]
+<a href=#907 id=907 data-nosnippet>907</a>        </span><span class="kw">fn </span>try_fill_bytes(<span class="kw-2">&amp;mut </span><span class="self">self</span>, dst: <span class="kw-2">&amp;mut </span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="self">Self</span>::Error&gt; {
+<a href=#908 id=908 data-nosnippet>908</a>            <span class="kw">let </span><span class="kw-2">mut </span>left = dst;
+<a href=#909 id=909 data-nosnippet>909</a>            <span class="kw">while </span>left.len() &gt;= <span class="number">8 </span>{
+<a href=#910 id=910 data-nosnippet>910</a>                <span class="kw">let </span>(l, r) = left.split_at_mut(<span class="number">8</span>);
+<a href=#911 id=911 data-nosnippet>911</a>                left = r;
+<a href=#912 id=912 data-nosnippet>912</a>                l.copy_from_slice(<span class="kw-2">&amp;</span><span class="self">self</span>.next_u64().to_le_bytes());
+<a href=#913 id=913 data-nosnippet>913</a>            }
+<a href=#914 id=914 data-nosnippet>914</a>            <span class="kw">let </span>n = left.len();
+<a href=#915 id=915 data-nosnippet>915</a>            <span class="kw">if </span>n &gt; <span class="number">0 </span>{
+<a href=#916 id=916 data-nosnippet>916</a>                left.copy_from_slice(<span class="kw-2">&amp;</span><span class="self">self</span>.next_u32().to_le_bytes()[..n]);
+<a href=#917 id=917 data-nosnippet>917</a>            }
+<a href=#918 id=918 data-nosnippet>918</a>            <span class="prelude-val">Ok</span>(())
+<a href=#919 id=919 data-nosnippet>919</a>        }
+<a href=#920 id=920 data-nosnippet>920</a>    }
+<a href=#921 id=921 data-nosnippet>921</a>
+<a href=#922 id=922 data-nosnippet>922</a>    <span class="attr">#[test]
+<a href=#923 id=923 data-nosnippet>923</a>    </span><span class="kw">fn </span>reserved_transport_parameter_ignored_when_read() {
+<a href=#924 id=924 data-nosnippet>924</a>        <span class="kw">let </span><span class="kw-2">mut </span>buf = Vec::new();
+<a href=#925 id=925 data-nosnippet>925</a>        <span class="kw">let </span>reserved_parameter = ReservedTransportParameter::random(<span class="kw-2">&amp;mut </span>rand::rng());
+<a href=#926 id=926 data-nosnippet>926</a>        <span class="macro">assert!</span>(reserved_parameter.payload_len &lt; ReservedTransportParameter::MAX_PAYLOAD_LEN);
+<a href=#927 id=927 data-nosnippet>927</a>        <span class="macro">assert!</span>(reserved_parameter.id.<span class="number">0 </span>% <span class="number">31 </span>== <span class="number">27</span>);
+<a href=#928 id=928 data-nosnippet>928</a>
+<a href=#929 id=929 data-nosnippet>929</a>        reserved_parameter.write(<span class="kw-2">&amp;mut </span>buf);
+<a href=#930 id=930 data-nosnippet>930</a>        <span class="macro">assert!</span>(!buf.is_empty());
+<a href=#931 id=931 data-nosnippet>931</a>        <span class="kw">let </span>read_params = TransportParameters::read(Side::Server, <span class="kw-2">&amp;mut </span>buf.as_slice()).unwrap();
+<a href=#932 id=932 data-nosnippet>932</a>        <span class="macro">assert_eq!</span>(read_params, TransportParameters::default());
+<a href=#933 id=933 data-nosnippet>933</a>    }
+<a href=#934 id=934 data-nosnippet>934</a>
+<a href=#935 id=935 data-nosnippet>935</a>    <span class="attr">#[test]
+<a href=#936 id=936 data-nosnippet>936</a>    </span><span class="kw">fn </span>read_semantic_validation() {
+<a href=#937 id=937 data-nosnippet>937</a>        <span class="attr">#[allow(clippy::type_complexity)]
+<a href=#938 id=938 data-nosnippet>938</a>        </span><span class="kw">let </span>illegal_params_builders: Vec&lt;Box&lt;<span class="kw">dyn </span>FnMut(<span class="kw-2">&amp;mut </span>TransportParameters)&gt;&gt; = <span class="macro">vec!</span>[
+<a href=#939 id=939 data-nosnippet>939</a>            Box::new(|t| {
+<a href=#940 id=940 data-nosnippet>940</a>                <span class="comment">// This min_ack_delay is bigger than max_ack_delay!
+<a href=#941 id=941 data-nosnippet>941</a>                </span><span class="kw">let </span>min_ack_delay = t.max_ack_delay.<span class="number">0 </span>* <span class="number">1_000 </span>+ <span class="number">1</span>;
+<a href=#942 id=942 data-nosnippet>942</a>                t.min_ack_delay = <span class="prelude-val">Some</span>(VarInt::from_u64(min_ack_delay).unwrap())
+<a href=#943 id=943 data-nosnippet>943</a>            }),
+<a href=#944 id=944 data-nosnippet>944</a>            Box::new(|t| {
+<a href=#945 id=945 data-nosnippet>945</a>                <span class="comment">// Preferred address can only be sent by senders (and we are reading the transport
+<a href=#946 id=946 data-nosnippet>946</a>                // params as a client)
+<a href=#947 id=947 data-nosnippet>947</a>                </span>t.preferred_address = <span class="prelude-val">Some</span>(PreferredAddress {
+<a href=#948 id=948 data-nosnippet>948</a>                    address_v4: <span class="prelude-val">Some</span>(SocketAddrV4::new(Ipv4Addr::LOCALHOST, <span class="number">42</span>)),
+<a href=#949 id=949 data-nosnippet>949</a>                    address_v6: <span class="prelude-val">None</span>,
+<a href=#950 id=950 data-nosnippet>950</a>                    connection_id: ConnectionId::new(<span class="kw-2">&amp;</span>[]),
+<a href=#951 id=951 data-nosnippet>951</a>                    stateless_reset_token: [<span class="number">0xab</span>; RESET_TOKEN_SIZE].into(),
+<a href=#952 id=952 data-nosnippet>952</a>                })
+<a href=#953 id=953 data-nosnippet>953</a>            }),
+<a href=#954 id=954 data-nosnippet>954</a>        ];
+<a href=#955 id=955 data-nosnippet>955</a>
+<a href=#956 id=956 data-nosnippet>956</a>        <span class="kw">for </span><span class="kw-2">mut </span>builder <span class="kw">in </span>illegal_params_builders {
+<a href=#957 id=957 data-nosnippet>957</a>            <span class="kw">let </span><span class="kw-2">mut </span>buf = Vec::new();
+<a href=#958 id=958 data-nosnippet>958</a>            <span class="kw">let </span><span class="kw-2">mut </span>params = TransportParameters::default();
+<a href=#959 id=959 data-nosnippet>959</a>            builder(<span class="kw-2">&amp;mut </span>params);
+<a href=#960 id=960 data-nosnippet>960</a>            params.write(<span class="kw-2">&amp;mut </span>buf);
+<a href=#961 id=961 data-nosnippet>961</a>
+<a href=#962 id=962 data-nosnippet>962</a>            <span class="macro">assert_eq!</span>(
+<a href=#963 id=963 data-nosnippet>963</a>                TransportParameters::read(Side::Server, <span class="kw-2">&amp;mut </span>buf.as_slice()),
+<a href=#964 id=964 data-nosnippet>964</a>                <span class="prelude-val">Err</span>(Error::IllegalValue)
+<a href=#965 id=965 data-nosnippet>965</a>            );
+<a href=#966 id=966 data-nosnippet>966</a>        }
+<a href=#967 id=967 data-nosnippet>967</a>    }
+<a href=#968 id=968 data-nosnippet>968</a>
+<a href=#969 id=969 data-nosnippet>969</a>    <span class="attr">#[test]
+<a href=#970 id=970 data-nosnippet>970</a>    </span><span class="kw">fn </span>resumption_params_validation() {
+<a href=#971 id=971 data-nosnippet>971</a>        <span class="kw">let </span>high_limit = TransportParameters {
+<a href=#972 id=972 data-nosnippet>972</a>            initial_max_streams_uni: <span class="number">32u32</span>.into(),
+<a href=#973 id=973 data-nosnippet>973</a>            ..TransportParameters::default()
+<a href=#974 id=974 data-nosnippet>974</a>        };
+<a href=#975 id=975 data-nosnippet>975</a>        <span class="kw">let </span>low_limit = TransportParameters {
+<a href=#976 id=976 data-nosnippet>976</a>            initial_max_streams_uni: <span class="number">16u32</span>.into(),
+<a href=#977 id=977 data-nosnippet>977</a>            ..TransportParameters::default()
+<a href=#978 id=978 data-nosnippet>978</a>        };
+<a href=#979 id=979 data-nosnippet>979</a>        high_limit.validate_resumption_from(<span class="kw-2">&amp;</span>low_limit).unwrap();
+<a href=#980 id=980 data-nosnippet>980</a>        low_limit.validate_resumption_from(<span class="kw-2">&amp;</span>high_limit).unwrap_err();
+<a href=#981 id=981 data-nosnippet>981</a>    }
+<a href=#982 id=982 data-nosnippet>982</a>}</code></pre></div></section></main></body></html>
