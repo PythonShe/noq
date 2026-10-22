@@ -20,12 +20,11 @@ use bytes::{Bytes, BytesMut};
 use frame::StreamMetaVec;
 
 use rand::{RngExt, SeedableRng, rngs::StdRng};
-use rustc_hash::FxHashMap;
 use thiserror::Error;
 use tracing::{debug, error, trace, trace_span, warn};
 
 use crate::{
-    Dir, Duration, EndpointConfig, FourTuple, Frame, INITIAL_MTU, Instant, MAX_CID_SIZE,
+    Dir, Duration, EndpointConfig, FourTuple, Frame, FxHashMap, INITIAL_MTU, Instant, MAX_CID_SIZE,
     MAX_STREAM_COUNT, MIN_INITIAL_SIZE, Side, StreamId, TIMER_GRANULARITY, TokenStore, Transmit,
     TransportError, TransportErrorCode, VarInt,
     cid_queue::CidQueue,
@@ -6613,8 +6612,7 @@ impl Connection {
             && scheduling_info.may_send_data
             && space_id == SpaceId::Data
         {
-            self.streams
-                .write_stream_frames(builder, self.config.send_fairness, stats);
+            self.streams.write_stream_frames(builder, stats);
         }
 
         // Bundle a pending ACK with other frames when there is room for it.
