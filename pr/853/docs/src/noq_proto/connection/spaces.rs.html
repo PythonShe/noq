@@ -149,7 +149,7 @@
 <a href=#149 id=149 data-nosnippet>149</a>        <span class="kw">let </span>acks = <span class="self">self
 <a href=#150 id=150 data-nosnippet>150</a>            </span>.number_spaces
 <a href=#151 id=151 data-nosnippet>151</a>            .values()
-<a href=#152 id=152 data-nosnippet>152</a>            .any(|pns| pns.pending_acks.can_send());
+<a href=#152 id=152 data-nosnippet>152</a>            .any(|pns| pns.pending_acks.should_send());
 <a href=#153 id=153 data-nosnippet>153</a>        <span class="kw">let </span>space_specific = <span class="self">self</span>.number_spaces.get(<span class="kw-2">&amp;</span>path_id).is_some_and(|s| {
 <a href=#154 id=154 data-nosnippet>154</a>            s.pending_ping || s.pending_immediate_ack || !s.pending_path_responses.is_empty()
 <a href=#155 id=155 data-nosnippet>155</a>        });
@@ -1194,7 +1194,7 @@
 <a href=#1194 id=1194 data-nosnippet>1194</a>            .map(|earliest_unacked| earliest_unacked + max_ack_delay)
 <a href=#1195 id=1195 data-nosnippet>1195</a>    }
 <a href=#1196 id=1196 data-nosnippet>1196</a>
-<a href=#1197 id=1197 data-nosnippet>1197</a>    <span class="doccomment">/// Whether any ACK frames SHOULD be sent
+<a href=#1197 id=1197 data-nosnippet>1197</a>    <span class="doccomment">/// Whether any ACK frames SHOULD be sent.
 <a href=#1198 id=1198 data-nosnippet>1198</a>    ///
 <a href=#1199 id=1199 data-nosnippet>1199</a>    /// This is used in the top-level [`Connection::space_can_send`], so determines if a
 <a href=#1200 id=1200 data-nosnippet>1200</a>    /// packet will be built. It is often possible to construct new ACK ranges to send
@@ -1202,16 +1202,16 @@
 <a href=#1202 id=1202 data-nosnippet>1202</a>    /// processing those at the receiver costs CPU for very little improvements.
 <a href=#1203 id=1203 data-nosnippet>1203</a>    ///
 <a href=#1204 id=1204 data-nosnippet>1204</a>    /// [`Connection::space_can_send`]: super::Connection::space_can_send
-<a href=#1205 id=1205 data-nosnippet>1205</a>    </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>can_send(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+<a href=#1205 id=1205 data-nosnippet>1205</a>    </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>should_send(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
 <a href=#1206 id=1206 data-nosnippet>1206</a>        <span class="self">self</span>.immediate_ack_required &amp;&amp; !<span class="self">self</span>.ranges.is_empty()
 <a href=#1207 id=1207 data-nosnippet>1207</a>    }
 <a href=#1208 id=1208 data-nosnippet>1208</a>
 <a href=#1209 id=1209 data-nosnippet>1209</a>    <span class="doccomment">/// Whether an ACK frame could be opportunistically bundled with other frames.
 <a href=#1210 id=1210 data-nosnippet>1210</a>    ///
-<a href=#1211 id=1211 data-nosnippet>1211</a>    /// Unlike [`Self::can_send`], this does not require `immediate_ack_required` to be set:
+<a href=#1211 id=1211 data-nosnippet>1211</a>    /// Unlike [`Self::should_send`], this does not require `immediate_ack_required` to be set:
 <a href=#1212 id=1212 data-nosnippet>1212</a>    /// bundling a pending ACK into a packet that is being sent anyway is essentially free, as
 <a href=#1213 id=1213 data-nosnippet>1213</a>    /// opposed to sending a dedicated ACK-only packet for it.
-<a href=#1214 id=1214 data-nosnippet>1214</a>    </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>can_send_with_other_frames(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+<a href=#1214 id=1214 data-nosnippet>1214</a>    </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>can_send(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
 <a href=#1215 id=1215 data-nosnippet>1215</a>        !<span class="self">self</span>.ranges.is_empty()
 <a href=#1216 id=1216 data-nosnippet>1216</a>    }
 <a href=#1217 id=1217 data-nosnippet>1217</a>
@@ -1254,7 +1254,7 @@
 <a href=#1254 id=1254 data-nosnippet>1254</a>            <span class="self">self</span>.is_out_of_order(packet_number, prev_largest_ack_eliciting, dedup);
 <a href=#1255 id=1255 data-nosnippet>1255</a>
 <a href=#1256 id=1256 data-nosnippet>1256</a>        <span class="comment">// Arm max_ack_delay timer if necessary
-<a href=#1257 id=1257 data-nosnippet>1257</a>        </span><span class="kw">if </span><span class="self">self</span>.earliest_ack_eliciting_since_last_ack_sent.is_none() &amp;&amp; !<span class="self">self</span>.can_send() {
+<a href=#1257 id=1257 data-nosnippet>1257</a>        </span><span class="kw">if </span><span class="self">self</span>.earliest_ack_eliciting_since_last_ack_sent.is_none() &amp;&amp; !<span class="self">self</span>.should_send() {
 <a href=#1258 id=1258 data-nosnippet>1258</a>            <span class="self">self</span>.earliest_ack_eliciting_since_last_ack_sent = <span class="prelude-val">Some</span>(now);
 <a href=#1259 id=1259 data-nosnippet>1259</a>            <span class="kw">return </span><span class="bool-val">true</span>;
 <a href=#1260 id=1260 data-nosnippet>1260</a>        }
@@ -1580,11 +1580,11 @@
 <a href=#1580 id=1580 data-nosnippet>1580</a>
 <a href=#1581 id=1581 data-nosnippet>1581</a>        <span class="comment">// Sanity check
 <a href=#1582 id=1582 data-nosnippet>1582</a>        </span><span class="macro">assert!</span>(!acks.ranges.is_empty());
-<a href=#1583 id=1583 data-nosnippet>1583</a>        <span class="macro">assert!</span>(!acks.can_send());
+<a href=#1583 id=1583 data-nosnippet>1583</a>        <span class="macro">assert!</span>(!acks.should_send());
 <a href=#1584 id=1584 data-nosnippet>1584</a>
 <a href=#1585 id=1585 data-nosnippet>1585</a>        <span class="comment">// Can send ACK after max_ack_delay exceeded
 <a href=#1586 id=1586 data-nosnippet>1586</a>        </span>acks.set_immediate_ack_required();
-<a href=#1587 id=1587 data-nosnippet>1587</a>        <span class="macro">assert!</span>(acks.can_send());
+<a href=#1587 id=1587 data-nosnippet>1587</a>        <span class="macro">assert!</span>(acks.should_send());
 <a href=#1588 id=1588 data-nosnippet>1588</a>    }
 <a href=#1589 id=1589 data-nosnippet>1589</a>
 <a href=#1590 id=1590 data-nosnippet>1590</a>    <span class="attr">#[test]

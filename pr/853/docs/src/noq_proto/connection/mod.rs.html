@@ -6177,7 +6177,7 @@
 <a href=#6177 id=6177 data-nosnippet>6177</a>            <span class="kw">for </span>path_id <span class="kw">in </span>space
 <a href=#6178 id=6178 data-nosnippet>6178</a>                .number_spaces
 <a href=#6179 id=6179 data-nosnippet>6179</a>                .iter_mut()
-<a href=#6180 id=6180 data-nosnippet>6180</a>                .filter(|(<span class="kw">_</span>, pns)| pns.pending_acks.can_send())
+<a href=#6180 id=6180 data-nosnippet>6180</a>                .filter(|(<span class="kw">_</span>, pns)| pns.pending_acks.should_send())
 <a href=#6181 id=6181 data-nosnippet>6181</a>                .map(|(<span class="kw-2">&amp;</span>path_id, <span class="kw">_</span>)| path_id)
 <a href=#6182 id=6182 data-nosnippet>6182</a>                .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;()
 <a href=#6183 id=6183 data-nosnippet>6183</a>            {
@@ -6643,7 +6643,7 @@
 <a href=#6643 id=6643 data-nosnippet>6643</a>                .number_spaces
 <a href=#6644 id=6644 data-nosnippet>6644</a>                .iter()
 <a href=#6645 id=6645 data-nosnippet>6645</a>                .filter(|(other_path_id, pns)| {
-<a href=#6646 id=6646 data-nosnippet>6646</a>                    pns.pending_acks.can_send_with_other_frames()
+<a href=#6646 id=6646 data-nosnippet>6646</a>                    pns.pending_acks.can_send()
 <a href=#6647 id=6647 data-nosnippet>6647</a>                        &amp;&amp; !builder
 <a href=#6648 id=6648 data-nosnippet>6648</a>                            .sent_frames()
 <a href=#6649 id=6649 data-nosnippet>6649</a>                            .largest_acked
