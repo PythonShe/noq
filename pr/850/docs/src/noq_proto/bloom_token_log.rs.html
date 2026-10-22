@@ -3,13 +3,13 @@
 <a href=#3 id=3 data-nosnippet>3</a>    hash::{BuildHasher, Hasher},
 <a href=#4 id=4 data-nosnippet>4</a>    mem::{size_of, take},
 <a href=#5 id=5 data-nosnippet>5</a>};
-<a href=#6 id=6 data-nosnippet>6</a><span class="kw">use </span>std::{collections::HashSet, sync::Mutex};
+<a href=#6 id=6 data-nosnippet>6</a><span class="kw">use </span>std::sync::Mutex;
 <a href=#7 id=7 data-nosnippet>7</a>
 <a href=#8 id=8 data-nosnippet>8</a><span class="kw">use </span>fastbloom::BloomFilter;
 <a href=#9 id=9 data-nosnippet>9</a><span class="kw">use </span>rustc_hash::FxBuildHasher;
 <a href=#10 id=10 data-nosnippet>10</a><span class="kw">use </span>tracing::{trace, warn};
 <a href=#11 id=11 data-nosnippet>11</a>
-<a href=#12 id=12 data-nosnippet>12</a><span class="kw">use crate</span>::{Duration, SystemTime, TokenLog, TokenReuseError, UNIX_EPOCH};
+<a href=#12 id=12 data-nosnippet>12</a><span class="kw">use crate</span>::{Duration, HashSet, SystemTime, TokenLog, TokenReuseError, UNIX_EPOCH};
 <a href=#13 id=13 data-nosnippet>13</a>
 <a href=#14 id=14 data-nosnippet>14</a><span class="doccomment">/// Bloom filter-based [`TokenLog`]
 <a href=#15 id=15 data-nosnippet>15</a>///
