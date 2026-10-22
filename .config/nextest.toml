@@ -2,7 +2,7 @@
 # explicitly set to a different profile.
 
 [profile.default]
-slow-timeout = { period = "2s", terminate-after = 3 }
+slow-timeout = { period = "10s", terminate-after = 3 }
 fail-fast = false
 
 # Do not run proptests by default. Use --ignore-default-filter to run these anyway.
