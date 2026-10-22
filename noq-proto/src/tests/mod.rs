@@ -4233,7 +4233,9 @@ fn voluntary_ack_with_large_datagrams() {
 #[test]
 fn ack_bundled_with_datagram() {
     let _guard = subscribe();
-    let mut pair = ConnPair::default();
+    let mut pair = Pair::default_with_deterministic_pns();
+    let (client_ch, server_ch) = pair.connect_with(client_config_with_deterministic_pns());
+    let mut pair = ConnPair::new(pair, client_ch, server_ch);
 
     // Let the server receive a datagram from the client. A single ack-eliciting packet doesn't
     // cross `ack_eliciting_threshold`, so the resulting ACK isn't urgent enough to warrant a
