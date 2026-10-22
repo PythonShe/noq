@@ -149,7 +149,7 @@ impl PacketSpace {
         let acks = self
             .number_spaces
             .values()
-            .any(|pns| pns.pending_acks.can_send());
+            .any(|pns| pns.pending_acks.should_send());
         let space_specific = self.number_spaces.get(&path_id).is_some_and(|s| {
             s.pending_ping || s.pending_immediate_ack || !s.pending_path_responses.is_empty()
         });
@@ -1194,7 +1194,7 @@ impl PendingAcks {
             .map(|earliest_unacked| earliest_unacked + max_ack_delay)
     }
 
-    /// Whether any ACK frames SHOULD be sent
+    /// Whether any ACK frames SHOULD be sent.
     ///
     /// This is used in the top-level [`Connection::space_can_send`], so determines if a
     /// packet will be built. It is often possible to construct new ACK ranges to send
@@ -1202,16 +1202,16 @@ impl PendingAcks {
     /// processing those at the receiver costs CPU for very little improvements.
     ///
     /// [`Connection::space_can_send`]: super::Connection::space_can_send
-    pub(super) fn can_send(&self) -> bool {
+    pub(super) fn should_send(&self) -> bool {
         self.immediate_ack_required && !self.ranges.is_empty()
     }
 
     /// Whether an ACK frame could be opportunistically bundled with other frames.
     ///
-    /// Unlike [`Self::can_send`], this does not require `immediate_ack_required` to be set:
+    /// Unlike [`Self::should_send`], this does not require `immediate_ack_required` to be set:
     /// bundling a pending ACK into a packet that is being sent anyway is essentially free, as
     /// opposed to sending a dedicated ACK-only packet for it.
-    pub(super) fn can_send_with_other_frames(&self) -> bool {
+    pub(super) fn can_send(&self) -> bool {
         !self.ranges.is_empty()
     }
 
@@ -1254,7 +1254,7 @@ impl PendingAcks {
             self.is_out_of_order(packet_number, prev_largest_ack_eliciting, dedup);
 
         // Arm max_ack_delay timer if necessary
-        if self.earliest_ack_eliciting_since_last_ack_sent.is_none() && !self.can_send() {
+        if self.earliest_ack_eliciting_since_last_ack_sent.is_none() && !self.should_send() {
             self.earliest_ack_eliciting_since_last_ack_sent = Some(now);
             return true;
         }
@@ -1580,11 +1580,11 @@ mod test {
 
         // Sanity check
         assert!(!acks.ranges.is_empty());
-        assert!(!acks.can_send());
+        assert!(!acks.should_send());
 
         // Can send ACK after max_ack_delay exceeded
         acks.set_immediate_ack_required();
-        assert!(acks.can_send());
+        assert!(acks.should_send());
     }
 
     #[test]

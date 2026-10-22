@@ -6177,7 +6177,7 @@ impl Connection {
             for path_id in space
                 .number_spaces
                 .iter_mut()
-                .filter(|(_, pns)| pns.pending_acks.can_send())
+                .filter(|(_, pns)| pns.pending_acks.should_send())
                 .map(|(&path_id, _)| path_id)
                 .collect::<Vec<_>>()
             {
@@ -6643,7 +6643,7 @@ impl Connection {
                 .number_spaces
                 .iter()
                 .filter(|(other_path_id, pns)| {
-                    pns.pending_acks.can_send_with_other_frames()
+                    pns.pending_acks.can_send()
                         && !builder
                             .sent_frames()
                             .largest_acked
