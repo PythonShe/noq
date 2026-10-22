@@ -6622,7 +6622,7 @@ impl Connection {
         // dedicated ACK-only packet. But sending an ACK with every single packet we transmit
         // would waste the peer's resources processing redundant ACKs, so each path's
         // `next_bundled_ack_time` throttles how often we do this when not already required by
-        // `PendingAcks::can_send`.
+        // `PendingAcks::should_send`.
         //
         // We only do this if the packet already carries a frame that itself justifies sending
         // a packet (i.e. one that would make `SentFrames::is_ack_only` return `false` once an
@@ -6727,7 +6727,7 @@ impl Connection {
     /// does not fit in the remaining frame space, nothing is written and `false` is returned.
     ///
     /// This method assumes ACKs are pending, and should only be called if
-    /// `PendingAcks::can_send_with_other_frames()` returns `true`.
+    /// [`spaces::PendingAcks::can_send()`] returns `true`.
     fn try_populate_acks<'a, 'b>(
         now: Instant,
         receiving_ecn: bool,
