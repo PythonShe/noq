@@ -388,10 +388,10 @@
 <a href=#388 id=388 data-nosnippet>388</a>    }
 <a href=#389 id=389 data-nosnippet>389</a>
 <a href=#390 id=390 data-nosnippet>390</a>    <span class="doccomment">/// Whether any stream data is queued for this path, regardless of control frames.
-<a href=#391 id=391 data-nosnippet>391</a>    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>can_send_stream_data(<span class="kw-2">&amp;</span><span class="self">self</span>, path: PathId, include_affinity_any: bool) -&gt; bool {
+<a href=#391 id=391 data-nosnippet>391</a>    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>can_send_stream_data(<span class="kw-2">&amp;</span><span class="self">self</span>, path: PathId, status_allows_data: bool) -&gt; bool {
 <a href=#392 id=392 data-nosnippet>392</a>        <span class="comment">// Empty writes and late ACKs can leave entries without pending work; loss recovery
 <a href=#393 id=393 data-nosnippet>393</a>        // can requeue reset streams.
-<a href=#394 id=394 data-nosnippet>394</a>        </span><span class="self">self</span>.pending.iter(path, include_affinity_any).any(|stream| {
+<a href=#394 id=394 data-nosnippet>394</a>        </span><span class="self">self</span>.pending.iter(path, status_allows_data).any(|stream| {
 <a href=#395 id=395 data-nosnippet>395</a>            <span class="self">self</span>.send
 <a href=#396 id=396 data-nosnippet>396</a>                .get(<span class="kw-2">&amp;</span>stream.id)
 <a href=#397 id=397 data-nosnippet>397</a>                .and_then(|s| s.as_ref())
@@ -522,13 +522,13 @@
 <a href=#522 id=522 data-nosnippet>522</a>        builder: <span class="kw-2">&amp;mut </span>PacketBuilder&lt;<span class="lifetime">'a</span>, <span class="lifetime">'b</span>&gt;,
 <a href=#523 id=523 data-nosnippet>523</a>        stats: <span class="kw-2">&amp;mut </span>FrameStats,
 <a href=#524 id=524 data-nosnippet>524</a>        path: PathId,
-<a href=#525 id=525 data-nosnippet>525</a>        include_affinity_any: bool,
+<a href=#525 id=525 data-nosnippet>525</a>        status_allows_data: bool,
 <a href=#526 id=526 data-nosnippet>526</a>    ) {
 <a href=#527 id=527 data-nosnippet>527</a>        <span class="kw">while </span>builder.frame_space_remaining() &gt; frame::Stream::SIZE_BOUND {
 <a href=#528 id=528 data-nosnippet>528</a>            <span class="comment">// Pop the stream of the highest priority that currently has pending data. If
 <a href=#529 id=529 data-nosnippet>529</a>            // the stream still has some pending data left after writing, it will be
 <a href=#530 id=530 data-nosnippet>530</a>            // reinserted, otherwise not
-<a href=#531 id=531 data-nosnippet>531</a>            </span><span class="kw">let </span><span class="prelude-val">Some</span>(pending) = <span class="self">self</span>.pending.pop(path, include_affinity_any) <span class="kw">else </span>{
+<a href=#531 id=531 data-nosnippet>531</a>            </span><span class="kw">let </span><span class="prelude-val">Some</span>(pending) = <span class="self">self</span>.pending.pop(path, status_allows_data) <span class="kw">else </span>{
 <a href=#532 id=532 data-nosnippet>532</a>                <span class="kw">break</span>;
 <a href=#533 id=533 data-nosnippet>533</a>            };
 <a href=#534 id=534 data-nosnippet>534</a>
@@ -611,7 +611,7 @@
 <a href=#611 id=611 data-nosnippet>611</a>        }
 <a href=#612 id=612 data-nosnippet>612</a>
 <a href=#613 id=613 data-nosnippet>613</a>        <span class="kw">if </span>was_pending {
-<a href=#614 id=614 data-nosnippet>614</a>            <span class="self">self</span>.pending.remove(id);
+<a href=#614 id=614 data-nosnippet>614</a>            <span class="self">self</span>.pending.remove(id, stream.affinity);
 <a href=#615 id=615 data-nosnippet>615</a>        }
 <a href=#616 id=616 data-nosnippet>616</a>        entry.remove_entry();
 <a href=#617 id=617 data-nosnippet>617</a>        <span class="self">self</span>.stream_freed(id, StreamHalf::Send);
@@ -1510,12 +1510,12 @@
 <a href=#1510 id=1510 data-nosnippet>1510</a>        }
 <a href=#1511 id=1511 data-nosnippet>1511</a>
 <a href=#1512 id=1512 data-nosnippet>1512</a>        <span class="comment">// Moving a queued stream keeps its turn relative to streams in the destination bucket.
-<a href=#1513 id=1513 data-nosnippet>1513</a>        </span>queue.move_pending(ids[<span class="number">0</span>], <span class="prelude-val">Some</span>(path));
+<a href=#1513 id=1513 data-nosnippet>1513</a>        </span>queue.set_affinity(ids[<span class="number">0</span>], <span class="prelude-val">None</span>, <span class="prelude-val">Some</span>(path));
 <a href=#1514 id=1514 data-nosnippet>1514</a>        <span class="kw">for </span>id <span class="kw">in </span><span class="kw-2">&amp;</span>ids[..<span class="number">3</span>] {
 <a href=#1515 id=1515 data-nosnippet>1515</a>            <span class="macro">assert_eq!</span>(queue.pop(path, <span class="bool-val">true</span>).unwrap().id, <span class="kw-2">*</span>id);
 <a href=#1516 id=1516 data-nosnippet>1516</a>        }
 <a href=#1517 id=1517 data-nosnippet>1517</a>        <span class="macro">assert_eq!</span>(queue.len(), <span class="number">0</span>);
-<a href=#1518 id=1518 data-nosnippet>1518</a>        <span class="macro">assert!</span>(queue.sticky.is_empty());
+<a href=#1518 id=1518 data-nosnippet>1518</a>        <span class="macro">assert!</span>(queue.sticky_by_path.is_empty());
 <a href=#1519 id=1519 data-nosnippet>1519</a>    }
 <a href=#1520 id=1520 data-nosnippet>1520</a>
 <a href=#1521 id=1521 data-nosnippet>1521</a>    <span class="attr">#[test]
