@@ -1700,16 +1700,19 @@ impl Connection {
                     .map(|(&path_id, _)| path_id)
                     .collect::<Vec<_>>()
                 {
-                    Self::populate_acks(
-                        now,
-                        self.receiving_ecn,
-                        path_id,
-                        space_id,
-                        &mut self.spaces[space_id],
-                        is_multipath_negotiated,
-                        &mut builder,
-                        &mut self.path_stats.get_mut(path_id).frame_tx,
-                        self.crypto_state.has_keys(space_id.encryption_level()),
+                    debug_assert!(
+                        Self::populate_acks(
+                            now,
+                            self.receiving_ecn,
+                            path_id,
+                            space_id,
+                            &mut self.spaces[space_id],
+                            is_multipath_negotiated,
+                            &mut builder,
+                            &mut self.path_stats.get_mut(path_id).frame_tx,
+                            self.crypto_state.has_keys(space_id.encryption_level()),
+                        ),
+                        "ack didn't fit a freshly built packet"
                     );
                 }
 
@@ -6181,16 +6184,19 @@ impl Connection {
                 .map(|(&path_id, _)| path_id)
                 .collect::<Vec<_>>()
             {
-                Self::populate_acks(
-                    now,
-                    self.receiving_ecn,
-                    path_id,
-                    space_id,
-                    space,
-                    is_multipath_negotiated,
-                    builder,
-                    stats,
-                    space_has_keys,
+                debug_assert!(
+                    Self::populate_acks(
+                        now,
+                        self.receiving_ecn,
+                        path_id,
+                        space_id,
+                        space,
+                        is_multipath_negotiated,
+                        builder,
+                        stats,
+                        space_has_keys,
+                    ),
+                    "ack didn't fit a freshly built packet"
                 );
             }
         }
@@ -6653,7 +6659,7 @@ impl Connection {
                 .map(|(other_path_id, _)| *other_path_id)
                 .collect::<Vec<_>>()
             {
-                Self::try_populate_acks(
+                Self::populate_acks(
                     now,
                     self.receiving_ecn,
                     bundle_path_id,
@@ -6668,7 +6674,17 @@ impl Connection {
         }
     }
 
-    /// Write pending ACKs into a buffer
+    /// Writes pending ACKs into a buffer, if there is enough room for it.
+    ///
+    /// Returns whether the ACK was written. This is used both for dedicated ACK passes, where
+    /// the caller has already committed to sending an ACK (and should `debug_assert!` on the
+    /// result, since a `false` there indicates a packet was undersized for its own ACK), and to
+    /// opportunistically bundle an ACK onto a packet that is being sent for another reason
+    /// (e.g. it carries STREAM or DATAGRAM frames), where `false` just means it'll be retried on
+    /// a later packet.
+    ///
+    /// This method assumes ACKs are pending, and should only be called if
+    /// [`spaces::PendingAcks::can_send()`] returns `true`.
     fn populate_acks<'a, 'b>(
         now: Instant,
         receiving_ecn: bool,
@@ -6679,7 +6695,7 @@ impl Connection {
         builder: &mut PacketBuilder<'a, 'b>,
         stats: &mut FrameStats,
         space_has_keys: bool,
-    ) {
+    ) -> bool {
         // 0-RTT packets must never carry acks (which would have to be of handshake packets)
         debug_assert!(space_has_keys, "tried to send ACK in 0-RTT");
 
@@ -6693,54 +6709,6 @@ impl Connection {
                 "path acks must be sent in 1RTT space (have {space_id:?})"
             );
         }
-
-        let pns = space.for_path(path_id);
-        let ranges = pns.pending_acks.ranges();
-        debug_assert!(!ranges.is_empty(), "can not send empty ACK range");
-        let ecn = if receiving_ecn {
-            Some(&pns.ecn_counters)
-        } else {
-            None
-        };
-
-        let delay_micros = pns.pending_acks.ack_delay(now).as_micros() as u64;
-        // TODO: This should come from `TransportConfig` if that gets configurable.
-        let ack_delay_exp = TransportParameters::default().ack_delay_exponent;
-        let delay = delay_micros >> ack_delay_exp.into_inner();
-
-        if is_multipath_negotiated && space_id == SpaceId::Data {
-            if !ranges.is_empty() {
-                let frame = frame::PathAck::encoder(path_id, delay, ranges, ecn);
-                builder.write_frame(frame, stats);
-            }
-        } else {
-            builder.write_frame(frame::Ack::encoder(delay, ranges, ecn), stats);
-        }
-    }
-
-    /// Opportunistically writes a pending ACK into a buffer that is already carrying other
-    /// frames, if there is enough room for it.
-    ///
-    /// Unlike [`Self::populate_acks`], which is used for dedicated ACK passes where we have
-    /// already committed to sending an ACK, this is used to bundle an ACK onto a packet that is
-    /// being sent for another reason (e.g. it carries STREAM or DATAGRAM frames). If the ACK
-    /// does not fit in the remaining frame space, nothing is written and `false` is returned.
-    ///
-    /// This method assumes ACKs are pending, and should only be called if
-    /// [`spaces::PendingAcks::can_send()`] returns `true`.
-    fn try_populate_acks<'a, 'b>(
-        now: Instant,
-        receiving_ecn: bool,
-        path_id: PathId,
-        space_id: SpaceId,
-        space: &mut PacketSpace,
-        is_multipath_negotiated: bool,
-        builder: &mut PacketBuilder<'a, 'b>,
-        stats: &mut FrameStats,
-        space_has_keys: bool,
-    ) -> bool {
-        // 0-RTT packets must never carry acks (which would have to be of handshake packets)
-        debug_assert!(space_has_keys, "tried to send ACK in 0-RTT");
 
         let pns = space.for_path(path_id);
         let ranges = pns.pending_acks.ranges();
